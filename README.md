@@ -1,6 +1,6 @@
 # GuiDOS AmongUs Bot
 
-GuiDOS is a player bot for Among Us. The project is written in C# and I apologize to everyone who will ever lay eyes on this code. It's bad.
+GuiDOS is a player bot for Among Us. The project is written in C and C# and I apologize to everyone who will ever lay eyes on this code. It's bad.
 
 **NOTE: THIS HAS BEEN FORKED FROM THE [GlaDOS bot](https://github.com/altskop/GlaDOS-bot)!!** And I will update this time to time!
 
