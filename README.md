@@ -23,4 +23,4 @@ Find the binary in the [NOT RELEASED YET]. Run it during the round / in game lob
 
 The bot will talk through the audio output. In order to pipe it into discord as an input, I recommend using VB-CABLE Virtual Audio Device.
 
-If you want to make any code changes, I wish you luck in that dark place. I didn't leave any comments and the structure is a complete disaster. It was never meant to see the light of day.
+If you want to make any code changes, go at it, but the code is still pretty shitty.
