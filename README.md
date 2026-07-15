@@ -16,7 +16,6 @@ The project utilises memory scan from shlifedev to process game events.
 - Body reports
 - Advanced Reasoning
 - Crewmates tracking (by what they see on screen)
-- 
 - LOTS AND LOTS OF BUGS
 
 ## Getting started:
