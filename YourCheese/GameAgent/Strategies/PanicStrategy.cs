@@ -19,12 +19,12 @@ namespace YourCheese.GameAgent.Strategies
 
         public void run()
         {
-            while (Vector2.Distance(navigator.botPos, new Vector2(625, 145)) > 10)
-            navigator.setDestination(new Vector2(625, 145));
-            var taskInput = new TaskInput();
-            taskInput.pressE();
-            System.Threading.Thread.Sleep(500);
-            taskInput.mouseClick(new Vector2(960, 540));
+            var safePoint = new Vector2(770, 406);
+            while (Vector2.Distance(navigator.botPos, safePoint) > 10)
+            {
+                navigator.setDestination(safePoint);
+                System.Threading.Thread.Sleep(100);
+            }
         }
 
         public double getConfidence()

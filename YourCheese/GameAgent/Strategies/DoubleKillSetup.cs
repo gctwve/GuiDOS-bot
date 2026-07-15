@@ -54,8 +54,8 @@ namespace YourCheese.GameAgent.Strategies
                         if (player.colorId != partnerTarget.colorId)
                         {
                             myTarget = player;
-                            if (Vector2.Distance(map.gamePosToMeshPos(myTarget.position), map.gamePosToMeshPos(navigator.botPos)) > 10)
-                            navigator.setDestination(myTarget.position);
+                            if (Vector2.Distance(map.gamePosToMeshPos(myTarget.position), navigator.botPos) > 10)
+                            navigator.setDestination(map.gamePosToMeshPos(myTarget.position));
                         }
                     }
                 }

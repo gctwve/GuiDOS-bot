@@ -96,6 +96,10 @@ namespace YourCheese
         public List<PlayerInformation> players;
         public float lightRadius;
         public float emergencyCooldown;
+        public int gameState;
+        public bool isInLobby;
+        public bool isInGame;
+        public bool isInMeeting;
 
         public List<PlayerInformation> getImposters()
         {

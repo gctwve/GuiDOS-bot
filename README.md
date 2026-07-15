@@ -1,8 +1,8 @@
 # GuiDOS AmongUs Bot
 
-GuiDOS is a player bot for Among Us. The project is written in C# and I apologize to everyone who will ever lay eyes on this code. It's bad. 
+GuiDOS is a player bot for Among Us. The project is written in C# and I apologize to everyone who will ever lay eyes on this code. It's bad.
 
-****NOTE THIS HAS BEEN FOR BY THE [GlaDOS bot](https://github.com/altskop/GlaDOS-bot)!!** And I will update this time to time!
+**NOTE: THIS HAS BEEN FORKED FROM THE [GlaDOS bot](https://github.com/altskop/GlaDOS-bot)!!** And I will update this time to time!
 
 The bot will work on v2026.6.5. Every new patch will require updates to memory pointers.
 
@@ -24,5 +24,3 @@ Find the binary in the [NOT RELEASED YET]. Run it during the round / in game lob
 The bot will talk through the audio output. In order to pipe it into discord as an input, I recommend using VB-CABLE Virtual Audio Device.
 
 If you want to make any code changes, I wish you luck in that dark place. I didn't leave any comments and the structure is a complete disaster. It was never meant to see the light of day.
-
-Also, it requires a lot of processing power and DDR4 RAM. DDR3 just... isn't fast enough. Trust me, I built an entire new PC for this thing to run on and DDR3 just didn't cut it.

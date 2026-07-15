@@ -76,10 +76,10 @@ namespace ProcessUtil
         [StructLayout(LayoutKind.Sequential)]
         public struct MEMORY_BASIC_INFORMATION
         {
-            public int BaseAddress;
-            public int AllocationBase;
+            public IntPtr BaseAddress;
+            public IntPtr AllocationBase;
             public int AllocationProtect;
-            public int RegionSize;
+            public IntPtr RegionSize;
             public int State;
             public int Protect;
             public int Type;
@@ -112,7 +112,7 @@ namespace ProcessUtil
         static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, int dwSize, AllocationType dwFreeType);
 
         [DllImport("kernel32.dll")]
-        static extern int VirtualQueryEx(IntPtr hProcess, uint lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, int dwLength);
+        static extern int VirtualQueryEx(IntPtr hProcess, IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, int dwLength);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern UInt32 WaitForSingleObject(IntPtr hHandle, UInt32 dwMilliseconds);
@@ -324,13 +324,15 @@ namespace ProcessUtil
 
             if (offset > 0)
             {
-                address = (IntPtr)((int)address + offset);
+                address = new IntPtr(address.ToInt64() + offset);
             }
 
-            byte[] ptr = this.Read(address, 4);
+            byte[] ptr = this.Read(address, IntPtr.Size);
             if (ptr != null)
             {
-                ret = (IntPtr)BitConverter.ToInt32(ptr, 0);
+                ret = IntPtr.Size == 8
+                    ? new IntPtr(BitConverter.ToInt64(ptr, 0))
+                    : new IntPtr(BitConverter.ToInt32(ptr, 0));
             }
 
             return ret;

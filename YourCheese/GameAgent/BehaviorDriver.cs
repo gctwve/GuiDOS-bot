@@ -9,6 +9,14 @@ using YourCheese.GameAgent.Strategies;
 
 namespace YourCheese
 {
+    public enum BotStrategyMode
+    {
+        FinishTasks,
+        Balanced,
+        Follow,
+        SearchBodies
+    }
+
     public class BehaviorDriver
     {
         SkeldMap map;
@@ -19,8 +27,12 @@ namespace YourCheese
         RoundMemory roundMemory;
         GameDataContainer gameDataContainer;
         List<PlayerInformation> visiblePlayers;
+        MeetingChatDirector meetingChatDirector = new MeetingChatDirector();
+        LobbyChatDirector lobbyChatDirector = new LobbyChatDirector();
         public bool inEmergencyMeeting = false;
         bool talked = false;
+        static readonly Random random = new Random();
+        public BotStrategyMode StrategyMode { get; private set; } = BotStrategyMode.FinishTasks;
 
         public PlayerInformation reportedBody = PlayerInformation.Zero;
         PlayerInformation imposterPartner;
@@ -35,26 +47,47 @@ namespace YourCheese
 
         public void run()
         {
-            while (gameDataContainer == null)
+            while (gameDataContainer == null || !gameDataContainer.isInGame)
             {
-                System.Threading.Thread.Sleep(1500);
+                System.Threading.Thread.Sleep(100);
             }
             while (gameDataContainer.players.Count == 0)
             {
-                System.Threading.Thread.Sleep(1500);
+                System.Threading.Thread.Sleep(100);
             }
-            System.Threading.Thread.Sleep(8000);
+            System.Threading.Thread.Sleep(500);
             inEmergencyMeeting = false;
             talked = false;
             roundMemory.generatePlayerSightings(gameDataContainer.players);
             while (true)
             {
+                while (gameDataContainer == null || !gameDataContainer.isInGame)
+                {
+                    navigator.stop();
+                    System.Threading.Thread.Sleep(100);
+                }
+
                 while (!inEmergencyMeeting && !botInfo.isDead)
                 {
                     talked = false;
                     currentStrategy = selectStrategy();
+                    if (currentStrategy == null)
+                    {
+                        System.Threading.Thread.Sleep(100);
+                        continue;
+                    }
+
                     currentStrategy.run();
-                    roundMemory.addNewStrategy(currentStrategy);
+                    if (currentStrategy == null)
+                    {
+                        continue;
+                    }
+
+                    if (!inEmergencyMeeting && gameDataContainer != null && gameDataContainer.isInGame)
+                    {
+                        roundMemory.addNewStrategy(currentStrategy);
+                    }
+
                     if (currentStrategy is TaskDoingStrategy)
                     {
                         TaskDoingStrategy taskDoingStrategy = (TaskDoingStrategy)currentStrategy;
@@ -80,10 +113,10 @@ namespace YourCheese
                     {
                         new MeetingTalker(botInfo, gameDataContainer).tellTheMemory(roundMemory, reportedBody, map);
                         talked = true;
-                        roundMemory.refresh();
                         this.navigator = new Navigator(map);
-                        new VotingDriver().vote(this.gameDataContainer.getLivingPlayers().Count);
+                        Task.Factory.StartNew(() => new VotingDriver().vote(this.gameDataContainer, roundMemory));
                     }
+                    meetingChatDirector.Update(gameDataContainer, roundMemory, reportedBody, map);
                     System.Threading.Thread.Sleep(500);
                 }
                 while (inEmergencyMeeting && botInfo.isDead)
@@ -120,30 +153,90 @@ namespace YourCheese
 
             if (!botInfo.isImposter)
             {
-                int choice = new Random().Next(4);
-                switch (choice)
-                {
-                    case 0: //return new BodySearchingStrategy(navigator, map);
-                    case 1: return new FollowingStrategy(navigator, map, gameDataContainer.getLivingPlayersThatArentBot()[new Random().Next(gameDataContainer.getLivingPlayersThatArentBot().Count)]);
-                    case 2: 
-                    case 3:
-                    default: return new TaskDoingStrategy(navigator, map);
-                }
-                     
+                return selectCrewmateStrategy();
             }
             else
             {
-                int choice = new Random().Next(4);
-                switch (choice)
-                {
-                    case 0:
-                    case 1: return new FollowingStrategy(navigator, map, gameDataContainer.getLivingPlayersThatArentBot()[new Random().Next(gameDataContainer.getLivingPlayersThatArentBot().Count)]);
-                    case 2:
-                    case 3:
-                    default: return new TaskFakingStrategy(navigator, map, roundMemory.completedTasks);
-                }
+                return selectImposterStrategy();
             }
             throw new Exception();
+        }
+
+        private Strategy selectCrewmateStrategy()
+        {
+            switch (StrategyMode)
+            {
+                case BotStrategyMode.Balanced:
+                    return random.Next(5) == 0 ? getFollowStrategyOrTasks() : new TaskDoingStrategy(navigator, map);
+                case BotStrategyMode.Follow:
+                    return getFollowStrategyOrTasks();
+                case BotStrategyMode.SearchBodies:
+                    return new BodySearchingStrategy(navigator, map);
+                case BotStrategyMode.FinishTasks:
+                default:
+                    return new TaskDoingStrategy(navigator, map, true);
+            }
+        }
+
+        private Strategy selectImposterStrategy()
+        {
+            switch (StrategyMode)
+            {
+                case BotStrategyMode.Follow:
+                    return getFollowStrategyOrFakeTasks();
+                case BotStrategyMode.Balanced:
+                    return random.Next(4) == 0 ? getFollowStrategyOrFakeTasks() : new TaskFakingStrategy(navigator, map, roundMemory.completedTasks);
+                case BotStrategyMode.SearchBodies:
+                case BotStrategyMode.FinishTasks:
+                default:
+                    return new TaskFakingStrategy(navigator, map, roundMemory.completedTasks);
+            }
+        }
+
+        private Strategy getFollowStrategyOrTasks()
+        {
+            var livingTargets = gameDataContainer.getLivingPlayersThatArentBot();
+            if (livingTargets.Count == 0)
+            {
+                return new TaskDoingStrategy(navigator, map, true);
+            }
+
+            return new FollowingStrategy(navigator, map, livingTargets[random.Next(livingTargets.Count)]);
+        }
+
+        private Strategy getFollowStrategyOrFakeTasks()
+        {
+            var livingTargets = gameDataContainer.getLivingPlayersThatArentBot();
+            if (livingTargets.Count == 0)
+            {
+                return new TaskFakingStrategy(navigator, map, roundMemory.completedTasks);
+            }
+
+            return new FollowingStrategy(navigator, map, livingTargets[random.Next(livingTargets.Count)]);
+        }
+
+        public void CycleStrategyMode()
+        {
+            var modes = (BotStrategyMode[])Enum.GetValues(typeof(BotStrategyMode));
+            var nextIndex = (Array.IndexOf(modes, StrategyMode) + 1) % modes.Length;
+            StrategyMode = modes[nextIndex];
+            overrideStrategy(null);
+            refreshNav();
+            Console.WriteLine("Strategy mode changed to " + StrategyMode);
+        }
+
+        public void ClearGameMemory()
+        {
+            roundMemory.refresh();
+            meetingChatDirector.ClearMemory();
+            lobbyChatDirector.Reset();
+            talked = false;
+            reportedBody = PlayerInformation.Zero;
+        }
+
+        public void UpdateLobbyChat(GameDataContainer gameData)
+        {
+            lobbyChatDirector.Update(gameData);
         }
 
         public void updateBotInfo(PlayerInformation botInfo)
@@ -227,25 +320,45 @@ namespace YourCheese
 
         public void update(GameUpdate gameUpdate)
         {
-            
-            updateBotInfo(gameUpdate.gameDataContainer.botPlayer);
-            visiblePlayers = gameUpdate.visiblePlayers;
-            roundMemory.update(gameUpdate.events, gameUpdate.visiblePlayers);
-            if (gameDataContainer != null)
+            gameDataContainer = gameUpdate.gameDataContainer;
+            if (!gameDataContainer.isInGame)
+            {
+                if (currentStrategy != null)
+                {
+                    currentStrategy.abort();
+                }
+
+                queuedStrategy = null;
+                inEmergencyMeeting = false;
+                navigator.stop();
+                return;
+            }
+
+            if (gameDataContainer.isInMeeting)
             {
                 if (!inEmergencyMeeting)
                 {
-                    inEmergencyMeeting = isInEmergencyMeeting(gameUpdate.events);
+                    overrideStrategy(null);
                 }
-                else
-                {
-                    var closestPlayer = gameUpdate.gameDataContainer.getLivingPlayersThatArentBot()[0];
-                    if (closestPlayer.position != gameDataContainer.getPlayerByColor(closestPlayer.colorId).position)
-                        inEmergencyMeeting = false;
-                }
+
+                inEmergencyMeeting = true;
+                navigator.stop();
+                return;
             }
+
+            if (inEmergencyMeeting)
+            {
+                inEmergencyMeeting = false;
+                talked = false;
+                meetingChatDirector.ResetMeetingState();
+                refreshNav();
+            }
+
+            updateBotInfo(gameUpdate.gameDataContainer.botPlayer);
+            visiblePlayers = gameUpdate.visiblePlayers;
+            roundMemory.update(gameUpdate.events, gameUpdate.visiblePlayers);
+            inEmergencyMeeting = false;
             //inEmergencyMeeting = (gameDataContainer.emergencyCooldown < gameUpdate.gameDataContainer.emergencyCooldown);
-            gameDataContainer = gameUpdate.gameDataContainer;
             if (currentStrategy != null)
             currentStrategy.update(gameDataContainer);
             processEvents(gameUpdate.events, gameUpdate.gameDataContainer.getNearbyPlayers(botInfo.colorId));

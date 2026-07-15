@@ -3,11 +3,17 @@ namespace HamsterCheese.AmongUsMemory
     public sealed class Pattern
     {
         
-        //v2020.11.17s
-        public static string AmongusClient_Pointer = "GameAssembly.dll+143B334"; // FMJPJKCNIKM
-        public static string PlayerControl_Pointer = "GameAssembly.dll+1C57F7C"; // LBADNGJPJGH
-        public static string ShipStatus_Pointer = "GameAssembly.dll+1C57CAC"; //MIBEMIGLLGF
-        public static string PlayerControl_GetData = "55 8B EC 80 3D A9 D1 ??"; // LBADNGJPJGH.get_Data
+        // Among Us v17.4s build 7044
+        public static string AmongusClient_TypeInfo = "GameAssembly.dll+2AAEA30";
+        public static string PlayerControl_TypeInfo = "GameAssembly.dll+2AC2BF0";
+        public static string ShipStatus_TypeInfo = "GameAssembly.dll+2AD5BE8";
+        public static string NetworkedPlayerInfo_TypeInfo = "GameAssembly.dll+2AB52BC";
+        public static string MeetingHud_TypeInfo = "GameAssembly.dll+2AAF37C";
+        public static string ChatController_TypeInfo = "GameAssembly.dll+2AB8E90";
+
+        public static string PlayerControl_GetData = "GameAssembly.dll+5FBAD0";
+        public static string ShipStatus_CalculateLightRadius = "GameAssembly.dll+666850";
+        public static string NetworkedPlayerInfo_GetPlayerName = "GameAssembly.dll+816BB0";
 
 
     }

@@ -23,6 +23,49 @@ namespace YourCheese
         static BotStatus botStatusForm;
         static EventGenerator eventGenerator;
         static List<PlayerData> playerDatas = new List<PlayerData>(); 
+        static Task behaviorLoopTask = null;
+        static readonly object behaviorLoopLock = new object();
+        static bool wasInActiveRound = false;
+
+        static void StartBehaviorLoop()
+        {
+            lock (behaviorLoopLock)
+            {
+                if (behaviorLoopTask != null && !behaviorLoopTask.IsCompleted)
+                {
+                    return;
+                }
+
+                behaviorLoopTask = Task.Factory.StartNew(() =>
+                {
+                    try
+                    {
+                        behaviorDriver.run();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Behavior loop stopped: " + e);
+                    }
+                });
+            }
+        }
+
+        static void RefreshPlayerDatas()
+        {
+            foreach (var player in playerDatas)
+                player.StopObserveState();
+
+            playerDatas = HamsterCheese.AmongUsMemory.Cheese.GetAllPlayers();
+
+            foreach (var player in playerDatas)
+            {
+                player.onDie += (pos, colorId) => {
+                    Console.WriteLine("OnPlayerDied! Color ID :" + colorId);
+                };
+                player.StartObserveState();
+            }
+        }
+
         static void UpdateCheat()
         {
             /*while (true)
@@ -35,12 +78,22 @@ namespace YourCheese
             
             while (true)
             {
+                CheckHotkeys();
+                if (playerDatas.Count == 0)
+                {
+                    RefreshPlayerDatas();
+                }
+
                 Console.Clear();
                 ShipStatus shipStatus = HamsterCheese.AmongUsMemory.Cheese.shipStatus;
+                AmongUsClient client = HamsterCheese.AmongUsMemory.Cheese.getAmongUsClient();
                 //PrintRow($"Timer: {shipStatus.Timer}", $"EmergencyCooldown: {shipStatus.EmergencyCooldown}", $"Type: {shipStatus.Type}");
 
                 GameDataContainer gameData = new GameDataContainer();
                 gameData.emergencyCooldown = shipStatus.EmergencyCooldown;
+                gameData.gameState = (int)client.GameState;
+                bool meetingHudPresent = HamsterCheese.AmongUsMemory.Cheese.IsInMeeting();
+                bool localPlayerFound = false;
                 List<PlayerInformation> players = new List<PlayerInformation>();
                 
                 Console.WriteLine("Test Read Player Datas..");
@@ -49,16 +102,23 @@ namespace YourCheese
 
                 foreach (var data in playerDatas)
                 {
-                    var Name = HamsterCheese.AmongUsMemory.Utils.ReadString(data.PlayerInfo.Value.PlayerName);
+                    var playerInfo = data.PlayerInfo;
+                    if (!playerInfo.HasValue)
+                    {
+                        continue;
+                    }
+
+                    var Name = HamsterCheese.AmongUsMemory.Utils.ReadString(playerInfo.Value.PlayerName);
                     if (data.IsLocalPlayer)
                     {
-                        gameData.botPlayer = new PlayerInformation(data.Position, Name, data.PlayerInfo.Value.ColorId, data.PlayerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), data.PlayerInfo.Value.IsImpostor, data.getKillTimer());
+                        localPlayerFound = true;
+                        gameData.botPlayer = new PlayerInformation(data.Position, Name, playerInfo.Value.ColorId, playerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), playerInfo.Value.IsImpostor, data.getKillTimer());
                         LightSource ls = data.LightSource;
                         gameData.lightRadius = ls.LightRadius;
                     }
                     else
                     {
-                        PlayerInformation player = new PlayerInformation(data.Position, Name, data.PlayerInfo.Value.ColorId, data.PlayerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), data.PlayerInfo.Value.IsImpostor, data.getKillTimer());
+                        PlayerInformation player = new PlayerInformation(data.Position, Name, playerInfo.Value.ColorId, playerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), playerInfo.Value.IsImpostor, data.getKillTimer());
                         players.Add(player);
                     }
 
@@ -66,6 +126,15 @@ namespace YourCheese
                 }
 
                 gameData.players = players;
+                gameData.isInGame = localPlayerFound;
+                gameData.isInLobby = gameData.gameState == 1;
+                gameData.isInMeeting = meetingHudPresent && localPlayerFound;
+                var isActiveRound = gameData.isInGame && gameData.gameState == 2;
+                if (wasInActiveRound && !isActiveRound)
+                {
+                    behaviorDriver.ClearGameMemory();
+                }
+                wasInActiveRound = isActiveRound;
 
                 Console.ForegroundColor = ConsoleColor.Green;
                 PrintRow($"{gameData.botPlayer.name}", $"{gameData.botPlayer.position.x},{gameData.botPlayer.position.y}", $"{gameData.botPlayer.color}", $"{gameData.botPlayer.isDead.ToString()}", $"{gameData.botPlayer.remainingEmergencies.ToString()}", $"{gameData.botPlayer.inVent.ToString()}", $"{gameData.botPlayer.isImposter.ToString()}", $"{gameData.botPlayer.killTimer.ToString()}");
@@ -79,6 +148,8 @@ namespace YourCheese
                     PrintLine();
                 }
                 PrintRow($"Light level: {gameData.lightRadius}");
+                PrintRow($"StrategyMode: {behaviorDriver.StrategyMode}", "F6 cycles mode");
+                PrintRow($"GameState: {gameData.gameState}", $"Lobby: {gameData.isInLobby}", $"InGame: {gameData.isInGame}", $"Meeting: {gameData.isInMeeting}");
                 PrintRow($"OriginalPos: {gameData.botPlayer.position.x},{gameData.botPlayer.position.y}");
                 Vector2 meshPos = skeld.gamePosToMeshPos(gameData.botPlayer.position);
                 PrintRow($"MeshPos: {meshPos.x},{meshPos.y}");
@@ -88,11 +159,40 @@ namespace YourCheese
                 PrintRow($"Timer: {shipStatus.Timer}");
 
                 GameUpdate gameUpdate = eventGenerator.getGameUpdate(gameData);
+                if (gameData.isInLobby)
+                {
+                    behaviorDriver.UpdateLobbyChat(gameData);
+                }
+
                 if (gameUpdate.gameDataContainer != null && gameData.players.Count > 0)
+                {
                     behaviorDriver.update(gameUpdate);
+                    if (gameData.isInGame)
+                    {
+                        StartBehaviorLoop();
+                    }
+                }
                 botStatusForm.update(behaviorDriver);
 
                 System.Threading.Thread.Sleep(MEMORY_POLLING_PERIOD);
+            }
+        }
+
+        static void CheckHotkeys()
+        {
+            try
+            {
+                while (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey(true);
+                    if (key.Key == ConsoleKey.F6)
+                    {
+                        behaviorDriver.CycleStrategyMode();
+                    }
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -112,31 +212,10 @@ namespace YourCheese
                 // Update Player Data When Every Game
                 HamsterCheese.AmongUsMemory.Cheese.ObserveShipStatus((x) =>
                 {
-                    
-                    //stop observe state for init. 
-                    foreach(var player in playerDatas) 
-                        player.StopObserveState(); 
-
-
-                    playerDatas = HamsterCheese.AmongUsMemory.Cheese.GetAllPlayers();
-                    
-                  
-                 
-                    foreach (var player in playerDatas)
-                    {
-                        player.onDie += (pos, colorId) => {
-                            Console.WriteLine("OnPlayerDied! Color ID :" + colorId);
-                        }; 
-                        // player state check
-                        player.StartObserveState();
-                    }
-
-                    CancellationTokenSource cts2 = new CancellationTokenSource();
-                    Task.Factory.StartNew(
-                        behaviorDriver.run
-                    , cts2.Token);
-
+                    RefreshPlayerDatas();
                 });
+
+                RefreshPlayerDatas();
 
                 // Cheat Logic
                 CancellationTokenSource cts = new CancellationTokenSource();
@@ -185,5 +264,3 @@ namespace YourCheese
         } 
     }
 }
-
-

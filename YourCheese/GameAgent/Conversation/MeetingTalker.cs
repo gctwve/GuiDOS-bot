@@ -14,6 +14,7 @@ namespace YourCheese.GameAgent.Conversation
 
         PlayerInformation botInfo;
         GameDataContainer gameData;
+        private readonly GameChatMessenger chatMessenger = new GameChatMessenger();
 
         public MeetingTalker(PlayerInformation botInfo, GameDataContainer gameData)
         {
@@ -66,8 +67,13 @@ namespace YourCheese.GameAgent.Conversation
             {
                 text += player.color + ", ";
             }
+            Say(text);
+        }
+
+        public void Say(string text)
+        {
             SpeakTheText(text);
-            roundMemory.refresh();
+            chatMessenger.Send(text);
         }
 
         public void SpeakTheText(string text)

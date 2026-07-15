@@ -64,24 +64,105 @@ namespace HamsterCheese.AmongUsMemory
             {
                 if (PlayerInfoPTROffset == IntPtr.Zero)
                 {
-                    var ptr =  Methods.Call_PlayerControl_GetData(this.PlayerControllPTR);
+                    var ptr = Instance._cachedData;
+                    if (ptr == IntPtr.Zero)
+                    {
+                        ReadMemory();
+                        ptr = Instance._cachedData;
+                    }
+
+                    if (ptr == IntPtr.Zero)
+                    {
+                        return null;
+                    }
+
                     PlayerInfoPTR = ptr.GetAddress();
                     PlayerInfo pInfo = Utils.FromBytes<PlayerInfo>(Cheese.mem.ReadBytes(PlayerInfoPTR, Utils.SizeOf<PlayerInfo>()));
-                    PlayerInfoPTROffset = new IntPtr(ptr);
-                    playerInfo = pInfo;
+                    PlayerInfoPTROffset = ptr;
+                    playerInfo = HydratePlayerInfo(pInfo);
                     return (PlayerInfo)playerInfo;
 
                 }
                 else
                 {
                     PlayerInfo pInfo = Utils.FromBytes<PlayerInfo>(Cheese.mem.ReadBytes(PlayerInfoPTR, Utils.SizeOf<PlayerInfo>()));
-                    playerInfo = pInfo;
+                    playerInfo = HydratePlayerInfo(pInfo);
                     return (PlayerInfo)playerInfo;
                 }
 
             }
         }
         private PlayerInfo? playerInfo = null;
+
+        private PlayerInfo HydratePlayerInfo(PlayerInfo info)
+        {
+            info.IsImpostor = IsImpostorRole(info.RoleType) ? (byte)1 : (byte)0;
+            var outfit = ReadDefaultOutfit(info.Outfits);
+            if (outfit.HasValue)
+            {
+                info.ColorId = outfit.Value.ColorId;
+                info.PlayerName = outfit.Value.PlayerName;
+            }
+
+            return info;
+        }
+
+        private static bool IsImpostorRole(ushort roleType)
+        {
+            return roleType == 1 || roleType == 5 || roleType == 7 || roleType == 9 || roleType == 18;
+        }
+
+        private struct PlayerOutfitSnapshot
+        {
+            public byte ColorId;
+            public IntPtr PlayerName;
+        }
+
+        private PlayerOutfitSnapshot? ReadDefaultOutfit(IntPtr outfits)
+        {
+            if (outfits == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            var entries = Cheese.ReadPointer(outfits.Sum(0xC));
+            var count = Cheese.mem.ReadInt(outfits.Sum(0x10).GetAddress());
+            if (entries == IntPtr.Zero || count <= 0 || count > 32)
+            {
+                return null;
+            }
+
+            PlayerOutfitSnapshot? first = null;
+            for (var i = 0; i < count; i++)
+            {
+                var entry = entries.Sum(0x10 + (i * 0x10));
+                var hashCode = Cheese.mem.ReadInt(entry.GetAddress());
+                var key = Cheese.mem.ReadByte(entry.Sum(0x8).GetAddress());
+                var value = Cheese.ReadPointer(entry.Sum(0xC));
+                if (hashCode < 0 || value == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                var snapshot = new PlayerOutfitSnapshot()
+                {
+                    ColorId = (byte)Cheese.mem.ReadByte(value.Sum(0x8).GetAddress()),
+                    PlayerName = Cheese.ReadPointer(value.Sum(0x20))
+                };
+
+                if (key == 0)
+                {
+                    return snapshot;
+                }
+
+                if (!first.HasValue)
+                {
+                    first = snapshot;
+                }
+            }
+
+            return first;
+        }
 
         
         public LightSource LightSource
@@ -195,12 +276,13 @@ namespace HamsterCheese.AmongUsMemory
                 {
                     while (true)
                     {
-                        if (PlayerInfo.HasValue)
+                        var playerInfo = PlayerInfo;
+                        if (playerInfo.HasValue)
                         {
-                            if (observe_dieFlag == false && PlayerInfo.Value.IsDead == 1)
+                            if (observe_dieFlag == false && playerInfo.Value.IsDead == 1)
                             {
                                 observe_dieFlag = true;
-                                onDie?.Invoke(Position, PlayerInfo.Value.ColorId);
+                                onDie?.Invoke(Position, playerInfo.Value.ColorId);
                             }
                         }
                         System.Threading.Thread.Sleep(25); 
@@ -232,11 +314,13 @@ namespace HamsterCheese.AmongUsMemory
         {
             get
             {
-                if (Instance.myLight == IntPtr.Zero) return false;
-                else
+                var localPlayer = Cheese.GetLocalPlayer();
+                if (localPlayer != IntPtr.Zero)
                 {
-                    return true;
+                    return PlayerControllPTR == localPlayer;
                 }
+
+                return Instance.myLight != IntPtr.Zero;
             }
         }
 
@@ -245,9 +329,9 @@ namespace HamsterCheese.AmongUsMemory
         {
             try
             {
-                int _offset_vec2_position = 60;
+                int _offset_vec2_position = 0x44;
                 int _offset_vec2_sizeOf = 8;
-                var netTransform = ((int)Instance.NetTransform + _offset_vec2_position).ToString("X");
+                var netTransform = Instance.NetTransform.Sum(_offset_vec2_position).GetAddress();
                 var vec2Data= Cheese.mem.ReadBytes($"{netTransform}",_offset_vec2_sizeOf); // 주소로부터 8바이트 읽는다   
                 if (vec2Data != null && vec2Data.Length != 0)
                 {
@@ -271,9 +355,9 @@ namespace HamsterCheese.AmongUsMemory
         {
             try
             {
-                int _offset_vec2_position = 80;
+                int _offset_vec2_position = 0x4C;
                 int _offset_vec2_sizeOf = 8;
-                var netTransform = ((int)Instance.NetTransform + _offset_vec2_position).ToString("X");
+                var netTransform = Instance.NetTransform.Sum(_offset_vec2_position).GetAddress();
                 var vec2Data= Cheese.mem.ReadBytes($"{netTransform}",_offset_vec2_sizeOf); // 주소로부터 8바이트 읽는다  
                 if (vec2Data != null && vec2Data.Length != 0)
                 {

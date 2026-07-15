@@ -28,26 +28,21 @@ namespace HamsterCheese. AmongUsMemory
             Console.WriteLine("Init PlayerControl GetData");
             if (PlayerControl_GetDataPTR == IntPtr.Zero)
             {
-                var aobScan = HamsterCheese.AmongUsMemory.Cheese.mem.AoBScan(Pattern.PlayerControl_GetData);
-                aobScan.Wait();
-                if (aobScan.Result.Count() == 1)
-                {
-                    PlayerControl_GetDataPTR = (IntPtr)aobScan.Result.First(); 
-                }
+                PlayerControl_GetDataPTR = Cheese.ResolveAddress(Pattern.PlayerControl_GetData);
             }
         }
 
         [Call]
-        public static int Call_PlayerControl_GetData(IntPtr playerInfoPtr)
+        public static IntPtr Call_PlayerControl_GetData(IntPtr playerInfoPtr)
         { 
             Console.WriteLine("Call_PlayerControl_GetData");
             if (PlayerControl_GetDataPTR != IntPtr.Zero)
             {
                 var ptr = PlayerControl_GetDataPTR;
                 var playerInfoAddress = Cheese.ProcessMemory.CallFunction(ptr, playerInfoPtr); 
-                return playerInfoAddress;
+                return new IntPtr(playerInfoAddress);
             }  
-            return -1;
+            return IntPtr.Zero;
         }
 
         public static void Init()

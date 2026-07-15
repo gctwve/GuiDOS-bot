@@ -52,7 +52,7 @@ namespace YourCheese.GameAgent.Strategies
             Vertex closestPoint = null;
             foreach (var point in points)
             {
-                float temp = Vector2.Distance(this.map.gamePosToMeshPos(navigator.botPos), new Vector2(point.x, point.y));
+                float temp = Vector2.Distance(navigator.botPos, new Vector2(point.x, point.y));
                 if (temp < distance)
                 {
                     distance = temp;

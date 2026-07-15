@@ -11,21 +11,24 @@ namespace YourCheese.GameAgent.Strategies
         SkeldMap map;
         Navigator navigator;
         double confidence = 1;
+        bool finishAllTasks;
+        static readonly Random random = new Random();
         public List<GameTask> taskPositions;
         public List<GameTask> doneTasks = new List<GameTask>();
         TaskIdentifier currentTaskIdentifier;
 
-        public TaskDoingStrategy(Navigator navigator, SkeldMap map)
+        public TaskDoingStrategy(Navigator navigator, SkeldMap map, bool finishAllTasks = false)
         {
             this.navigator = navigator;
             this.map = map;
+            this.finishAllTasks = finishAllTasks;
         }
 
         public void run()
         {
             taskPositions = new TaskManager().getTaskPositions();
 
-            while (taskPositions.Count > 0 && new Random().NextDouble() < confidence)
+            while (taskPositions.Count > 0 && (finishAllTasks || random.NextDouble() < confidence))
             {
                 doTask();
             }
@@ -34,7 +37,6 @@ namespace YourCheese.GameAgent.Strategies
         private void doTask()
         {
             System.Threading.Thread.Sleep(500);
-            taskPositions = new TaskManager().getTaskPositions();
             var task = getClosestTask(taskPositions);
             if (task != null)
             {
@@ -44,6 +46,7 @@ namespace YourCheese.GameAgent.Strategies
                 currentTaskIdentifier.doTask();
                 System.Threading.Thread.Sleep(500);
                 doneTasks.Add(task);
+                taskPositions.Remove(task);
             }
             confidence -= 0.1;
         }
@@ -81,7 +84,7 @@ namespace YourCheese.GameAgent.Strategies
 
         public String getMode()
         {
-            return $"Doing tasks";
+            return finishAllTasks ? $"Finishing tasks" : $"Doing tasks";
         }
 
         public void abort()

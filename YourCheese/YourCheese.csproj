@@ -16,7 +16,7 @@
     </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x86</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -27,7 +27,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x86</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -94,14 +94,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AuUtils.cs" />
-    <Compile Include="Debug\MapForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Debug\MapForm.Designer.cs">
-      <DependentUpon>MapForm.cs</DependentUpon>
-    </Compile>
     <Compile Include="GameAgent\BehaviorDriver.cs" />
+    <Compile Include="GameAgent\Conversation\ChatMiniMemory.cs" />
+    <Compile Include="GameAgent\Conversation\GameChatMessenger.cs" />
+    <Compile Include="GameAgent\Conversation\LobbyChatDirector.cs" />
+    <Compile Include="GameAgent\Conversation\MeetingChatDirector.cs" />
     <Compile Include="GameAgent\Conversation\MeetingTalker.cs" />
+    <Compile Include="GameAgent\Constants.cs" />
     <Compile Include="GameAgent\DirectBitmap.cs" />
     <Compile Include="GameAgent\EventGenerator.cs" />
     <Compile Include="GameAgent\Forms\BotStatus.cs">
@@ -160,10 +159,18 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="GameAgent\Skeld\places.json" />
-    <None Include="GameAgent\Skeld\polygons.json" />
-    <None Include="GameAgent\Skeld\regions.json" />
-    <None Include="GameAgent\Skeld\waypoints.json" />
+    <None Include="GameAgent\Skeld\places.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="GameAgent\Skeld\polygons.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="GameAgent\Skeld\regions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="GameAgent\Skeld\waypoints.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -173,9 +180,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Debug\MapForm.resx">
-      <DependentUpon>MapForm.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="GameAgent\Forms\BotStatus.resx">
       <DependentUpon>BotStatus.cs</DependentUpon>
     </EmbeddedResource>
@@ -185,6 +189,12 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="GameAgent\Skeld\WalkableMesh.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="GameAgent\TaskSolvers\templates\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="License-LGPL.txt" />
   </ItemGroup>
   <ItemGroup />

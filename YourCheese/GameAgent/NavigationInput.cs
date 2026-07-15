@@ -19,6 +19,7 @@ namespace YourCheese
         public Vector2 velocity;
         public Vector2 previousVelocity;
         public int iterationsLost = 0;
+        private float previousDistanceToWaypoint = float.MaxValue;
         public static InputSimulator inputSimulator = new InputSimulator();
 
         public bool abort = false;
@@ -27,6 +28,7 @@ namespace YourCheese
         {
             while (!waypoint.isReached(position, (nextWaypoint==null)) && !abort)
             {
+                var currentDistanceToWaypoint = Vector2.Distance(position, new Vector2(waypoint.x, waypoint.y));
                 if (nextWaypoint != null)
                 {
                     if (PolyPathfinder.InLineOfSight(polygons, new Vertex(position), new Vertex(nextWaypoint))){
@@ -45,10 +47,6 @@ namespace YourCheese
 
                 if (PolyPathfinder.InLineOfSight(polygons, new Vertex(position), new Vertex(waypoint)))
                 {
-                    if (velocity.x > 3 || velocity.y > 3)
-                    {
-                        iterationsLost = 0;
-                    }
                     if (!(Math.Abs(position.y - waypoint.y) > (Math.Abs(position.x - waypoint.x) + 70)))
                         getToX(waypoint.x, distance);
                     if (!(Math.Abs(position.x - waypoint.x) > (Math.Abs(position.y - waypoint.y) + 70)))
@@ -61,20 +59,27 @@ namespace YourCheese
                     getToY(waypoint.y, 2);
                 }
 
-                if (velocity.x <= 3 && velocity.y <= 3)
+                if (previousDistanceToWaypoint - currentDistanceToWaypoint > 0.35f)
+                {
+                    iterationsLost = 0;
+                }
+                else
                 {
                     iterationsLost += 1;
                 }
+                previousDistanceToWaypoint = currentDistanceToWaypoint;
 
-                if (iterationsLost >= 500)
+                if (iterationsLost >= 220)
                 {
-                    //releaseInput();
+                    releaseInput();
                     throw new NavigationError();
                 }
 
                 interpolatePosition();
                 System.Threading.Thread.Sleep(10);
             }
+            iterationsLost = 0;
+            previousDistanceToWaypoint = float.MaxValue;
         }
 
         public void releaseInput()

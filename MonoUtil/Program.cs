@@ -1,25 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
+using System.IO;
 
 namespace MonoUtil
 {
     class Program
     {
         static void Main(string[] args)
-        { 
-            if(args.Length != 0)
+        {
+            if (args.Length != 0)
             {
                 Console.WriteLine(args[0]);
-                HamsterCheese.StructGenerator.Generator.Generate(args[0], args[1]);
+                HamsterCheese.StructGenerator.Generator.Generate(args[0], args.Length > 1 ? args[1] : null);
                 return;
             }
-            Console.WriteLine(args[0]);
-                HamsterCheese.StructGenerator.Generator.Generate(@"C:\Users\shlif\OneDrive\Documents\GitHub\AmongUsMemory\AmongUsMemory\XmlStructs", null); 
 
-                System.Threading.Thread.Sleep(99999);
+            var repoRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\.."));
+            var xmlStructsPath = Path.Combine(repoRoot, "AmongUsMemory", "XmlStructs");
+            Console.WriteLine(xmlStructsPath);
+            HamsterCheese.StructGenerator.Generator.Generate(xmlStructsPath, null);
+
+            System.Threading.Thread.Sleep(99999);
         }
     }
 }

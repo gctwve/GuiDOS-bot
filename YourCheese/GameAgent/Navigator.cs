@@ -54,22 +54,52 @@ namespace YourCheese
 
         public void setDestination(Vector2 target)
         {
-            List<Waypoint> route = getWaypoints(target);
-            if (route == null) 
+            if (IsCafeTableTarget(botPos) && !IsCafeTableTarget(target))
+            {
+                Console.WriteLine("Escaping cafe table zone before normal route.");
+            }
+
+            if (IsCafeTableTarget(target))
+            {
+                Console.WriteLine($"Refusing cafe table target: {target.x}, {target.y}");
                 return;
-            try
+            }
+
+            for (int attempt = 0; attempt < 3 && !abortBool; attempt++)
             {
-                walkTheRoute(route);
-            } catch (NavigationError e)
-            {
-                setDestination(target);
+                Console.WriteLine($"Navigating from {botPos.x},{botPos.y} to {target.x},{target.y}");
+                List<Waypoint> route = getWaypoints(target);
+                if (route == null)
+                {
+                    Console.WriteLine("No route found.");
+                    return;
+                }
+                try
+                {
+                    walkTheRoute(route);
+                    return;
+                } catch (NavigationError)
+                {
+                    navigationInput.releaseInput();
+                    System.Threading.Thread.Sleep(150);
+                }
             }
         }
 
         public void followPlayer(Vector2 target)
         {
+            if (IsCafeTableTarget(target))
+            {
+                Console.WriteLine($"Refusing cafe table follow target: {target.x}, {target.y}");
+                return;
+            }
+
             List<Waypoint> route = getWaypoints(target);
-            if (route == null) return;
+            if (route == null)
+            {
+                Console.WriteLine("No follow route found.");
+                return;
+            }
             try
             {
                 if (route.Count > 5)
@@ -124,6 +154,11 @@ namespace YourCheese
         {
             navigationInput.abort = true;
             abortBool = true;
+        }
+
+        private bool IsCafeTableTarget(Vector2 target)
+        {
+            return target.x >= 560 && target.x <= 720 && target.y >= 95 && target.y <= 210;
         }
     }
 }
