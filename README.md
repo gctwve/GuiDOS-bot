@@ -16,6 +16,10 @@ The project utilises memory scan from shlifedev to process game events.
 - Body reports
 - Advanced Reasoning
 - Crewmates tracking (by what they see on screen)
+- Imposter role use [BETA]
+- Audio output and chat output (uh very annoying)
+- Use of new memory pointers
+- Better code
 - LOTS AND LOTS OF BUGS
 
 ## Getting started:
@@ -23,4 +27,4 @@ Find the binary in the [NOT RELEASED YET]. Run it during the round / in game lob
 
 The bot will talk through the audio output. In order to pipe it into discord as an input, I recommend using VB-CABLE Virtual Audio Device.
 
-If you want to make any code changes, go at it, but the code is still pretty shitty.
+If you want to make any code changes, go at it, but the code is still shitty.
