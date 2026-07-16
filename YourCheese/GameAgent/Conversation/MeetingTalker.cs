@@ -24,54 +24,116 @@ namespace YourCheese.GameAgent.Conversation
 
         public void tellTheMemory(RoundMemory roundMemory, PlayerInformation reportedBody, SkeldMap map)
         {
-            String text = "";
+            var lines = new List<string>();
             if (!reportedBody.position.IsGarbage())
             {
-                text += "I found " + reportedBody.color + "'s body in " + map.getLocationRegionName(map.gamePosToMeshPos(reportedBody.position)) + ".";
+                lines.Add("I found " + reportedBody.color + "'s body in " + map.getLocationRegionName(map.gamePosToMeshPos(reportedBody.position)) + ".");
             }
+
             foreach (var myEvent in roundMemory.witnessedEvents)
             {
                 if (myEvent is DeathEvent)
                 {
                     DeathEvent deathEvent = (DeathEvent)myEvent;
-                    PlayerInformation killer;
                     if (!botInfo.isImposter)
                     {
-                        killer = deathEvent.killer;
-                        text += "I watched " + deathEvent.killer.color + " murder " + deathEvent.victim.color + " in " + map.getLocationRegionName(map.gamePosToMeshPos(deathEvent.position)) + ".";
+                        lines.Add("I watched " + deathEvent.killer.color + " murder " + deathEvent.victim.color + " in " + map.getLocationRegionName(map.gamePosToMeshPos(deathEvent.position)) + ".");
                     }
-                    else
-                    {
-                       
-                    }
-                    
                 }
                 else if (myEvent is VentEvent)
                 {
                     if (!botInfo.isImposter)
                     {
                         VentEvent ventEvent = (VentEvent)myEvent;
-                        text += ventEvent.venter.color + " vented right in front of me in " + map.getLocationRegionName(map.gamePosToMeshPos(ventEvent.position)) + ".";
+                        lines.Add(ventEvent.venter.color + " vented right in front of me in " + map.getLocationRegionName(map.gamePosToMeshPos(ventEvent.position)) + ".");
                     }
                 }
             }
-            if (roundMemory.strategies.Count > 0)
-                text += "This round, I was ";
-            foreach (var strat in roundMemory.strategies)
+
+            var activity = BuildActivitySummary(roundMemory);
+            if (!string.IsNullOrWhiteSpace(activity))
             {
-                text += strat.getAsString() + ", ";
+                lines.Add(activity);
             }
+
+            var roleEvidence = BuildImposterRoleEvidence();
+            if (!string.IsNullOrWhiteSpace(roleEvidence))
+            {
+                lines.Add(roleEvidence);
+            }
+
             if (roundMemory.getTrustedPlayers().Count > 0)
-            text += ". I trust ";
-            foreach (var player in roundMemory.getTrustedPlayers())
             {
-                text += player.color + ", ";
+                var trusted = roundMemory.getTrustedPlayers().Take(3).Select(player => player.color);
+                lines.Add("I kept seeing " + string.Join(", ", trusted) + ", so they looked safe to me.");
             }
-            Say(text);
+
+            if (lines.Count == 0)
+            {
+                lines.Add("I do not have hard evidence, but I can say what I was doing before the meeting.");
+            }
+
+            Say(string.Join(" ", lines));
+        }
+
+        private string BuildActivitySummary(RoundMemory roundMemory)
+        {
+            var completedTasks = roundMemory.completedTasks
+                .Select(task => task.name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .Take(4)
+                .ToList();
+
+            var modes = roundMemory.strategies
+                .Select(strategy => strategy.getMode())
+                .Where(mode => !string.IsNullOrWhiteSpace(mode))
+                .Distinct()
+                .Take(3)
+                .ToList();
+
+            if (completedTasks.Count > 0)
+            {
+                return "Before the meeting I was doing " + string.Join(", ", completedTasks) + ".";
+            }
+
+            if (modes.Count > 0)
+            {
+                return "Before the meeting I was " + string.Join(", then ", modes).ToLowerInvariant() + ".";
+            }
+
+            return null;
+        }
+
+        private string BuildImposterRoleEvidence()
+        {
+            if (!botInfo.isImposter)
+            {
+                return null;
+            }
+
+            switch (botInfo.roleType)
+            {
+                case BotRoleType.Shapeshifter:
+                    return "Role read: colors are weak evidence this round because a shapeshifter can frame someone.";
+                case BotRoleType.Phantom:
+                    return "Role read: if anyone vanished near a kill, that matters more than normal pathing.";
+                case BotRoleType.Viper:
+                    return "Role read: this looks like normal impostor pathing, so check who had isolated access.";
+                case BotRoleType.Impostor:
+                    return "Role read: no special role clue from me, just pathing and isolation.";
+                default:
+                    return null;
+            }
         }
 
         public void Say(string text)
         {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
             SpeakTheText(text);
             chatMessenger.Send(text);
         }

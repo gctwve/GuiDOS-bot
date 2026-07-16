@@ -1,96 +1,122 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using WindowsInput;
+using System;
 using WindowsInput.Native;
 
 namespace YourCheese
 {
     class TaskInput
     {
-        private InputSimulator inputSimulator = new InputSimulator();
-
-        private static double MONITOR_X_OFFSET = 0;
+        public static bool SuppressActionKeys { get; set; } = false;
 
         public void mouseClick(Vector2 position)
         {
+            if (SuppressActionKeys)
+            {
+                return;
+            }
+
             moveMouse(position);
-            inputSimulator.Mouse.LeftButtonClick();
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseDown();
+            System.Threading.Thread.Sleep(70);
+            NativeInput.MouseUp();
+            System.Threading.Thread.Sleep(80);
         }
 
         public void mouseDown(Vector2 position)
         {
+            if (SuppressActionKeys)
+            {
+                return;
+            }
+
             moveMouse(position);
-            inputSimulator.Mouse.LeftButtonDown();
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseDown();
         }
 
         public void releaseMouse()
         {
-            inputSimulator.Mouse.LeftButtonUp();
+            NativeInput.MouseUp();
         }
 
         public void pressE()
         {
-            inputSimulator.Keyboard.KeyPress(VirtualKeyCode.VK_E);
+            pressKey(VirtualKeyCode.VK_E);
         }
 
         public void pressR()
         {
-            inputSimulator.Keyboard.KeyPress(VirtualKeyCode.VK_R);
+            pressKey(VirtualKeyCode.VK_R);
         }
 
         public void pressQ()
         {
-            inputSimulator.Keyboard.KeyPress(VirtualKeyCode.VK_Q);
+            pressKey(VirtualKeyCode.VK_Q);
             System.Threading.Thread.Sleep(50);
+        }
+
+        public void pressF()
+        {
+            pressKey(VirtualKeyCode.VK_F);
+            System.Threading.Thread.Sleep(100);
         }
 
         public void pressEsc()
         {
-            inputSimulator.Keyboard.KeyPress(VirtualKeyCode.ESCAPE);
+            pressKey(VirtualKeyCode.ESCAPE);
         }
 
         public void closeTask()
         {
-            mouseClick(new Vector2(1700, 300));
+            mouseClick(TaskScreenLayout.CloseButton);
         }
 
         public void dragMouse(Vector2 position, Vector2 destination)
         {
+            if (SuppressActionKeys)
+            {
+                return;
+            }
+
             moveMouse(position);
-            System.Threading.Thread.Sleep(20);
-            inputSimulator.Mouse.LeftButtonDown();
-            System.Threading.Thread.Sleep(20);
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseDown();
+            System.Threading.Thread.Sleep(80);
             moveMouse(destination);
-            System.Threading.Thread.Sleep(20);
-            inputSimulator.Mouse.LeftButtonUp();
-            System.Threading.Thread.Sleep(20);
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseUp();
+            System.Threading.Thread.Sleep(80);
         }
 
         public void dragMouseNoRelease(Vector2 position, Vector2 destination)
         {
+            if (SuppressActionKeys)
+            {
+                return;
+            }
+
             moveMouse(position);
-            System.Threading.Thread.Sleep(20);
-            inputSimulator.Mouse.LeftButtonDown();
-            System.Threading.Thread.Sleep(20);
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseDown();
+            System.Threading.Thread.Sleep(80);
             moveMouse(destination);
-            System.Threading.Thread.Sleep(20);
+            System.Threading.Thread.Sleep(80);
         }
 
         public void dragMouseLinear(Vector2 position, Vector2 destination, float milliseconds)
         {
-            var distance = Vector2.Distance(position, destination);
-            int steps = (int) Math.Round(milliseconds / 20);
+            if (SuppressActionKeys)
+            {
+                return;
+            }
 
+            int steps = Math.Max(1, (int)Math.Round(milliseconds / 20));
             Vector2[] points = Vector2.pointsInBetween(position, destination, steps);
 
             moveMouse(position);
-            System.Threading.Thread.Sleep(20);
-            inputSimulator.Mouse.LeftButtonDown();
-            System.Threading.Thread.Sleep(20);
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseDown();
+            System.Threading.Thread.Sleep(80);
 
             foreach (var point in points)
             {
@@ -99,16 +125,28 @@ namespace YourCheese
             }
 
             moveMouse(destination);
-            System.Threading.Thread.Sleep(20);
-            inputSimulator.Mouse.LeftButtonUp();
+            System.Threading.Thread.Sleep(80);
+            NativeInput.MouseUp();
+            System.Threading.Thread.Sleep(80);
+        }
 
+        private void pressKey(VirtualKeyCode key)
+        {
+            if (SuppressActionKeys)
+            {
+                return;
+            }
+
+            NativeInput.FocusAmongUs();
+            NativeInput.KeyPress(key);
         }
 
         private void moveMouse(Vector2 destination)
         {
-            var x = destination.x * 65535 / Screen.PrimaryScreen.Bounds.Width;
-            var y = destination.y * 65535 / Screen.PrimaryScreen.Bounds.Height;
-            inputSimulator.Mouse.MoveMouseTo(Convert.ToDouble(x), Convert.ToDouble(y));
+            NativeInput.FocusAmongUs();
+            var screenDestination = GameWindow.DesignPointToScreen(destination);
+            Console.WriteLine($"Moving real mouse to {screenDestination.x},{screenDestination.y} for task point {destination.x},{destination.y}");
+            NativeInput.MoveMouse(screenDestination);
         }
     }
 }

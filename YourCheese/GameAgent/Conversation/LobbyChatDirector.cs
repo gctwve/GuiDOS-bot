@@ -8,10 +8,12 @@ namespace YourCheese.GameAgent.Conversation
         private readonly GameChatMessenger chatMessenger = new GameChatMessenger();
         private readonly Random random = new Random();
         private DateTime lastLobbyChat = DateTime.MinValue;
+        private string lastLobbyMessage = string.Empty;
 
         public void Reset()
         {
             lastLobbyChat = DateTime.MinValue;
+            lastLobbyMessage = string.Empty;
         }
 
         public void Update(GameDataContainer gameData)
@@ -29,8 +31,11 @@ namespace YourCheese.GameAgent.Conversation
             var message = BuildLobbyMessage(gameData);
             if (!string.IsNullOrWhiteSpace(message))
             {
-                chatMessenger.Send(message);
-                lastLobbyChat = DateTime.UtcNow;
+                if (chatMessenger.Send(message))
+                {
+                    lastLobbyMessage = message;
+                    lastLobbyChat = DateTime.UtcNow;
+                }
             }
         }
 
@@ -45,7 +50,10 @@ namespace YourCheese.GameAgent.Conversation
                 "ready when everyone is"
             };
 
-            return messages.OrderBy(_ => random.Next()).FirstOrDefault();
+            return messages
+                .Where(message => !string.Equals(message, lastLobbyMessage, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(_ => random.Next())
+                .FirstOrDefault();
         }
     }
 }

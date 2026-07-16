@@ -10,6 +10,7 @@ namespace YourCheese.GameAgent.Strategies
     {
 
         double confidence = 1.2;
+        static readonly Random random = new Random();
         SkeldMap map;
         Navigator navigator;
         List<Vertex> points = new List<Vertex>();
@@ -23,7 +24,7 @@ namespace YourCheese.GameAgent.Strategies
         public void run()
         {
             points.AddRange(map.places);
-            while (new Random().NextDouble() < confidence)
+            while (random.NextDouble() < confidence)
             {
                 if (points.Count == 0)
                 {

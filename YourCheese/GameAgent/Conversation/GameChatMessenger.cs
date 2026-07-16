@@ -12,33 +12,38 @@ namespace YourCheese.GameAgent.Conversation
         private const int MaxChatLength = 120;
         private static readonly object SendLock = new object();
         private static DateTime lastSend = DateTime.MinValue;
+        private static readonly Queue<string> RecentMessages = new Queue<string>();
+        private static readonly HashSet<string> RecentMessageSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly InputSimulator inputSimulator = new InputSimulator();
 
         public bool Enabled { get; set; } = true;
 
-        public void Send(string text)
+        public bool Send(string text)
         {
             if (!Enabled)
             {
-                return;
+                return false;
             }
 
             var message = Normalize(text);
             if (string.IsNullOrWhiteSpace(message))
             {
-                return;
+                return false;
             }
 
             lock (SendLock)
             {
+                if (RecentMessageSet.Contains(message))
+                {
+                    return false;
+                }
+
                 var wait = 900 - (int)(DateTime.UtcNow - lastSend).TotalMilliseconds;
                 if (wait > 0)
                 {
                     Thread.Sleep(wait);
                 }
 
-                inputSimulator.Keyboard.KeyPress(VirtualKeyCode.ESCAPE);
-                Thread.Sleep(80);
                 inputSimulator.Keyboard.KeyPress(VirtualKeyCode.RETURN);
                 Thread.Sleep(180);
 
@@ -50,6 +55,27 @@ namespace YourCheese.GameAgent.Conversation
                 Thread.Sleep(50);
                 inputSimulator.Keyboard.KeyPress(VirtualKeyCode.RETURN);
                 lastSend = DateTime.UtcNow;
+                RememberSent(message);
+                return true;
+            }
+        }
+
+        public static void ClearRecentMessages()
+        {
+            lock (SendLock)
+            {
+                RecentMessages.Clear();
+                RecentMessageSet.Clear();
+            }
+        }
+
+        private static void RememberSent(string message)
+        {
+            RecentMessages.Enqueue(message);
+            RecentMessageSet.Add(message);
+            while (RecentMessages.Count > 16)
+            {
+                RecentMessageSet.Remove(RecentMessages.Dequeue());
             }
         }
 

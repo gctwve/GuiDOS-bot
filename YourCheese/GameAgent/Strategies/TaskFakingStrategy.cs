@@ -12,6 +12,7 @@ namespace YourCheese.GameAgent.Strategies
         SkeldMap map;
         Navigator navigator;
         double confidence = 1;
+        static readonly Random random = new Random();
         public List<GameTask> taskPositions;
         public List<GameTask> doneTasks;
 
@@ -24,10 +25,10 @@ namespace YourCheese.GameAgent.Strategies
 
         public void run()
         {
-            taskPositions = new TaskManager().getTaskPositions();
+            taskPositions = new TaskManager().getTaskPositions(true);
             taskPositions.RemoveAll(x => doneTasks.Contains(x));
 
-            while (taskPositions.Count > 0 && new Random().NextDouble() < confidence)
+            while (taskPositions.Count > 0 && random.NextDouble() < confidence)
             {
                 doTask();
             }
@@ -36,9 +37,20 @@ namespace YourCheese.GameAgent.Strategies
         private void doTask()
         {
             var task = getClosestTask(taskPositions);
-            navigator.setDestination(task.position);
-            System.Threading.Thread.Sleep(task.fakeTime+500);
-            doneTasks.Add(task);
+            if (task != null)
+            {
+                navigator.setDestination(task.position);
+                var attempted = new TaskIdentifier().doTask(task);
+                if (!attempted)
+                {
+                    System.Threading.Thread.Sleep(task.fakeTime+500);
+                }
+                if (!doneTasks.Contains(task))
+                {
+                    doneTasks.Add(task);
+                }
+                taskPositions.Remove(task);
+            }
             confidence -= 0.25;
         }
 

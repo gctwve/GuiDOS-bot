@@ -10,7 +10,7 @@ using WindowsInput.Native;
 namespace YourCheese
 {
 
-    public class GameTask
+    public class GameTask : IEquatable<GameTask>
     {
         public Vector2 position;
         public string name;
@@ -26,6 +26,34 @@ namespace YourCheese
             this.fakeTime = fakeTime;
             this.taskType = taskType;
             this.systemType = systemType;
+        }
+
+        public bool Equals(GameTask other)
+        {
+            if (other == null)
+            {
+                return false;
+            }
+
+            return taskType == other.taskType
+                && systemType == other.systemType
+                && string.Equals(name, other.name, StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as GameTask);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = taskType;
+                hash = (hash * 397) ^ systemType;
+                hash = (hash * 397) ^ (name == null ? 0 : name.GetHashCode());
+                return hash;
+            }
         }
     }
 
@@ -81,15 +109,22 @@ namespace YourCheese
             public int TaskType;
             public int StartAt;
             public int TargetSystem;
+            public int TaskStep;
+            public int MaxStep;
+
+            public bool IsComplete
+            {
+                get { return MaxStep > 0 && TaskStep >= MaxStep; }
+            }
         }
 
-        public List<GameTask> getTaskPositions()
+        public List<GameTask> getTaskPositions(bool allowFallbackTargets = false)
         {
             var liveTasks = ReadLiveTasks();
             if (liveTasks.Count == 0)
             {
-                Console.WriteLine("No live task list found; using safe non-cafe fallback targets.");
-                return GetSafeFallbackTargets();
+                Console.WriteLine("No live task list found.");
+                return allowFallbackTargets ? GetSafeFallbackTargets() : new List<GameTask>();
             }
 
             var filtered = TaskLocationResolver.taskLocations.Values
@@ -98,7 +133,7 @@ namespace YourCheese
                 .ToList();
 
             Console.WriteLine("Live task targets: " + string.Join(", ", filtered.Select(x => x.name).Distinct()));
-            return filtered.Count > 0 ? filtered : GetSafeFallbackTargets();
+            return filtered.Count > 0 || !allowFallbackTargets ? filtered : GetSafeFallbackTargets();
         }
 
         private static bool MatchesLiveTask(GameTask task, List<LiveTaskInfo> liveTasks)
@@ -112,28 +147,63 @@ namespace YourCheese
 
                 if (task.taskType == 2)
                 {
-                    return true;
+                    return MatchesFuelStep(task, liveTask);
                 }
 
                 if (task.taskType == 12)
                 {
-                    return liveTask.StartAt == 0 || task.systemType == liveTask.StartAt;
+                    return MatchesCurrentSystem(task, liveTask);
                 }
 
                 if (task.taskType == 7)
                 {
-                    return task.systemType == liveTask.StartAt || task.systemType == 6;
+                    return MatchesCurrentSystem(task, liveTask);
                 }
 
                 if (task.taskType == 14)
                 {
-                    return task.systemType == 7 || task.systemType == liveTask.TargetSystem;
+                    return MatchesDivertPowerStep(task, liveTask);
                 }
 
-                return liveTask.StartAt == 0 || task.systemType == liveTask.StartAt;
+                return MatchesCurrentSystem(task, liveTask);
             }
 
             return false;
+        }
+
+        private static bool MatchesCurrentSystem(GameTask task, LiveTaskInfo liveTask)
+        {
+            if (liveTask.StartAt != 0)
+            {
+                return task.systemType == liveTask.StartAt;
+            }
+
+            return IsUniqueTaskType(task.taskType);
+        }
+
+        private static bool MatchesFuelStep(GameTask task, LiveTaskInfo liveTask)
+        {
+            if (liveTask.StartAt != 0)
+            {
+                return task.systemType == liveTask.StartAt;
+            }
+
+            return task.systemType == 1;
+        }
+
+        private static bool MatchesDivertPowerStep(GameTask task, LiveTaskInfo liveTask)
+        {
+            if (liveTask.StartAt != 0)
+            {
+                return task.systemType == liveTask.StartAt;
+            }
+
+            return task.systemType == 7;
+        }
+
+        private static bool IsUniqueTaskType(int taskType)
+        {
+            return TaskLocationResolver.taskLocations.Values.Count(task => task.taskType == taskType) == 1;
         }
 
         private static List<LiveTaskInfo> ReadLiveTasks()
@@ -147,9 +217,9 @@ namespace YourCheese
                     return result;
                 }
 
-                var taskList = Cheese.ReadPointer(localPlayer.Sum(0xAC));
-                var items = taskList == IntPtr.Zero ? IntPtr.Zero : Cheese.ReadPointer(taskList.Sum(0x8));
-                var count = taskList == IntPtr.Zero ? 0 : Cheese.mem.ReadInt(taskList.Sum(0xC).GetAddress());
+                var taskList = Cheese.ReadPointer(localPlayer.Sum(Offset.PlayerControlMyTasks));
+                var items = taskList == IntPtr.Zero ? IntPtr.Zero : Cheese.ReadPointer(taskList.Sum(Offset.Il2CppListItems));
+                var count = taskList == IntPtr.Zero ? 0 : Cheese.mem.ReadInt(taskList.Sum(Offset.Il2CppListCount).GetAddress());
                 if (items == IntPtr.Zero || count <= 0 || count > 32)
                 {
                     return result;
@@ -157,20 +227,29 @@ namespace YourCheese
 
                 for (var i = 0; i < count; i++)
                 {
-                    var taskPtr = Cheese.ReadPointer(items.Sum(0x10 + (i * IntPtr.Size)));
+                    var taskPtr = Cheese.ReadPointer(items.Sum(Offset.Il2CppArrayFirstItem + (i * IntPtr.Size)));
                     if (taskPtr == IntPtr.Zero)
                     {
                         continue;
                     }
 
-                    var taskType = Cheese.mem.ReadInt(taskPtr.Sum(0x20).GetAddress());
+                    var taskType = Cheese.mem.ReadInt(taskPtr.Sum(Offset.PlayerTaskTaskType).GetAddress());
                     if (taskType >= 0 && taskType < 82)
                     {
+                        var taskStep = Cheese.mem.ReadInt(taskPtr.Sum(Offset.NormalPlayerTaskTaskStep).GetAddress());
+                        var maxStep = Cheese.mem.ReadInt(taskPtr.Sum(Offset.NormalPlayerTaskMaxStep).GetAddress());
+                        if (maxStep > 0 && taskStep >= maxStep)
+                        {
+                            continue;
+                        }
+
                         result.Add(new LiveTaskInfo()
                         {
                             TaskType = taskType,
-                            StartAt = Cheese.mem.ReadInt(taskPtr.Sum(0x1C).GetAddress()),
-                            TargetSystem = taskType == 14 ? Cheese.mem.ReadInt(taskPtr.Sum(0x60).GetAddress()) : -1
+                            StartAt = Cheese.mem.ReadInt(taskPtr.Sum(Offset.PlayerTaskStartAt).GetAddress()),
+                            TargetSystem = taskType == 14 ? Cheese.mem.ReadInt(taskPtr.Sum(Offset.DivertPowerTaskTargetSystem).GetAddress()) : -1,
+                            TaskStep = taskStep,
+                            MaxStep = maxStep
                         });
                     }
                 }

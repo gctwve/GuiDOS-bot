@@ -52,7 +52,7 @@ namespace YourCheese
             navigationInput.polygons = map.polygons;
         }
 
-        public void setDestination(Vector2 target)
+        public bool setDestination(Vector2 target)
         {
             if (IsCafeTableTarget(botPos) && !IsCafeTableTarget(target))
             {
@@ -62,7 +62,7 @@ namespace YourCheese
             if (IsCafeTableTarget(target))
             {
                 Console.WriteLine($"Refusing cafe table target: {target.x}, {target.y}");
-                return;
+                return false;
             }
 
             for (int attempt = 0; attempt < 3 && !abortBool; attempt++)
@@ -72,18 +72,21 @@ namespace YourCheese
                 if (route == null)
                 {
                     Console.WriteLine("No route found.");
-                    return;
+                    return false;
                 }
                 try
                 {
                     walkTheRoute(route);
-                    return;
+                    return !abortBool && Vector2.Distance(botPos, target) < 18;
                 } catch (NavigationError)
                 {
                     navigationInput.releaseInput();
                     System.Threading.Thread.Sleep(150);
                 }
             }
+
+            navigationInput.releaseInput();
+            return false;
         }
 
         public void followPlayer(Vector2 target)

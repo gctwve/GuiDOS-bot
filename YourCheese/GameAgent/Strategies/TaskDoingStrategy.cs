@@ -15,22 +15,28 @@ namespace YourCheese.GameAgent.Strategies
         static readonly Random random = new Random();
         public List<GameTask> taskPositions;
         public List<GameTask> doneTasks = new List<GameTask>();
+        private readonly List<GameTask> rememberedDoneTasks;
+        private readonly List<GameTask> initialTaskPositions;
         TaskIdentifier currentTaskIdentifier;
 
-        public TaskDoingStrategy(Navigator navigator, SkeldMap map, bool finishAllTasks = false)
+        public TaskDoingStrategy(Navigator navigator, SkeldMap map, bool finishAllTasks = false, List<GameTask> rememberedDoneTasks = null, List<GameTask> initialTaskPositions = null)
         {
             this.navigator = navigator;
             this.map = map;
             this.finishAllTasks = finishAllTasks;
+            this.rememberedDoneTasks = rememberedDoneTasks ?? new List<GameTask>();
+            this.initialTaskPositions = initialTaskPositions;
         }
 
         public void run()
         {
-            taskPositions = new TaskManager().getTaskPositions();
+            taskPositions = initialTaskPositions ?? new TaskManager().getTaskPositions(false);
+            taskPositions.RemoveAll(task => rememberedDoneTasks.Contains(task) || doneTasks.Contains(task));
 
             while (taskPositions.Count > 0 && (finishAllTasks || random.NextDouble() < confidence))
             {
                 doTask();
+                taskPositions.RemoveAll(task => rememberedDoneTasks.Contains(task) || doneTasks.Contains(task));
             }
         }
 
@@ -41,11 +47,20 @@ namespace YourCheese.GameAgent.Strategies
             if (task != null)
             {
                 //Console.WriteLine($"{task.position.x},{task.position.y}");
-                navigator.setDestination(task.position);
+                if (!navigator.setDestination(task.position))
+                {
+                    taskPositions.Remove(task);
+                    confidence -= 0.15;
+                    return;
+                }
+
                 currentTaskIdentifier = new TaskIdentifier();
-                currentTaskIdentifier.doTask();
+                var attempted = currentTaskIdentifier.doTask(task);
                 System.Threading.Thread.Sleep(500);
-                doneTasks.Add(task);
+                if (attempted && !doneTasks.Contains(task))
+                {
+                    doneTasks.Add(task);
+                }
                 taskPositions.Remove(task);
             }
             confidence -= 0.1;
@@ -90,6 +105,7 @@ namespace YourCheese.GameAgent.Strategies
         public void abort()
         {
             confidence = 0;
+            currentTaskIdentifier?.abort();
             navigator.abort();
 
         }

@@ -14,41 +14,36 @@ namespace YourCheese
     {
         public static DirectBitmap getGameScreen()
         {
-            Rectangle bounds = new Rectangle(0, 0, 1920, 1080);
-            using (DirectBitmap bitmap = new DirectBitmap(bounds.Width, bounds.Height))
+            using (var captured = CaptureScaledDesignScreen())
             {
+                DirectBitmap bitmap = new DirectBitmap(captured.Width, captured.Height);
                 using (Graphics g = Graphics.FromImage(bitmap.Bitmap))
                 {
-                    g.CopyFromScreen(new Point(bounds.Left, bounds.Top), Point.Empty, bounds.Size);
+                    g.DrawImage(captured, Point.Empty);
                 }
-                bitmap.Bitmap.Save("C:/Studio/templates/CURRENTLY_ORIGINAL.png", ImageFormat.Jpeg);
-                
+
+                SaveDebugImage(bitmap.Bitmap);
                 return bitmap;
             }
         }
 
         public static DirectBitmap getGameScreen(Rectangle bounds)
         {
-            using (DirectBitmap bitmap = new DirectBitmap(bounds.Width, bounds.Height))
+            DirectBitmap bitmap = new DirectBitmap(bounds.Width, bounds.Height);
+            using (var captured = CaptureScaledDesignScreen())
+            using (var cropped = captured.Clone(bounds, captured.PixelFormat))
+            using (Graphics g = Graphics.FromImage(bitmap.Bitmap))
             {
-                using (Graphics g = Graphics.FromImage(bitmap.Bitmap))
-                {
-                    g.CopyFromScreen(new Point(bounds.Left, bounds.Top), Point.Empty, bounds.Size);
-                }
-
-                return bitmap;
+                g.DrawImage(cropped, Point.Empty);
             }
+
+            return bitmap;
         }
 
         public static Bitmap getGameScreenAsImage()
         {
-            Rectangle bounds = new Rectangle(0, 0, 1920, 1080);
-            Bitmap bitmap = new Bitmap(bounds.Width, bounds.Height,
-                               PixelFormat.Format32bppArgb);
-
-            var g = Graphics.FromImage(bitmap);
-            g.CopyFromScreen(new Point(bounds.Left, bounds.Top), Point.Empty, bounds.Size);
-            bitmap.Save("C:/Studio/templates/CURRENTLY_ORIGINAL.png");
+            Bitmap bitmap = CaptureScaledDesignScreen();
+            SaveDebugImage(bitmap);
 
             return bitmap;
             
@@ -56,15 +51,46 @@ namespace YourCheese
 
         public static Bitmap getGameScreenAsImage(Rectangle bounds)
         {
-            Bitmap bitmap = new Bitmap(bounds.Width, bounds.Height,
-                               PixelFormat.Format32bppArgb);
-
-            var g = Graphics.FromImage(bitmap);
-            g.CopyFromScreen(new Point(bounds.Left, bounds.Top), Point.Empty, bounds.Size);
-            bitmap.Save("D:/Studio/Programming/HK47/AmongUsMemory-master/YourCheese/GameAgent/TaskSolvers/templates/CURRENTLY_ORIGINAL.png");
+            Bitmap bitmap;
+            using (var captured = CaptureScaledDesignScreen())
+            {
+                bitmap = captured.Clone(bounds, PixelFormat.Format32bppArgb);
+            }
+            SaveDebugImage(bitmap);
 
             return bitmap;
 
+        }
+
+        private static Bitmap CaptureScaledDesignScreen()
+        {
+            Rectangle bounds = GameWindow.GetContentBounds();
+            Bitmap source = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
+            using (Graphics g = Graphics.FromImage(source))
+            {
+                g.CopyFromScreen(new Point(bounds.Left, bounds.Top), Point.Empty, bounds.Size);
+            }
+
+            Bitmap scaled = new Bitmap(GameWindow.DesignWidth, GameWindow.DesignHeight, PixelFormat.Format32bppArgb);
+            using (Graphics g = Graphics.FromImage(scaled))
+            {
+                g.DrawImage(source, new Rectangle(0, 0, scaled.Width, scaled.Height));
+            }
+
+            source.Dispose();
+            return scaled;
+        }
+
+        private static void SaveDebugImage(Bitmap bitmap)
+        {
+            try
+            {
+                var path = System.IO.Path.Combine(Constants.FILE_LOCATION, "templates", "CURRENTLY_ORIGINAL.png");
+                bitmap.Save(path, ImageFormat.Png);
+            }
+            catch
+            {
+            }
         }
 
     }

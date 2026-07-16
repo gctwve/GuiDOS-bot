@@ -37,8 +37,20 @@ namespace YourCheese.GameAgent
 
         public void addNewStrategy(Strategy strategy)
         {
-            if (strategies.Count < 2)
-            strategies.Add(strategy);
+            if (strategy == null)
+            {
+                return;
+            }
+
+            if (strategies.Count == 0 || strategies.Last().getMode() != strategy.getMode())
+            {
+                strategies.Add(strategy);
+            }
+
+            if (strategies.Count > 5)
+            {
+                strategies.RemoveAt(0);
+            }
         }
 
         public void generatePlayerSightings(List<PlayerInformation> players)
@@ -69,6 +81,11 @@ namespace YourCheese.GameAgent
         public Dictionary<PlayerInformation, double> getPlayerSightings()
         {
             var result = new Dictionary<PlayerInformation, double>();
+            if (totalUpdates == 0)
+            {
+                return result;
+            }
+
             foreach (KeyValuePair<PlayerInformation, int> entry in playerSightMap)
             {
                 result[entry.Key] = (double) entry.Value / totalUpdates;

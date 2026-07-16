@@ -110,19 +110,25 @@
       <DependentUpon>BotStatus.cs</DependentUpon>
     </Compile>
     <Compile Include="GameAgent\GameCapture.cs" />
+    <Compile Include="GameAgent\GameWindow.cs" />
     <Compile Include="GameAgent\Memory.cs" />
     <Compile Include="GameAgent\NavigationInput.cs" />
+    <Compile Include="GameAgent\NativeInput.cs" />
     <Compile Include="GameAgent\Navigator.cs" />
     <Compile Include="GameAgent\SkeldMap.cs" />
+    <Compile Include="GameAgent\TaskScreenLayout.cs" />
     <Compile Include="GameAgent\Strategies\BodyGuardingStrategy.cs" />
     <Compile Include="GameAgent\Strategies\BodySearchingStrategy.cs" />
     <Compile Include="GameAgent\Strategies\DoubleKillSetup.cs" />
     <Compile Include="GameAgent\Strategies\FollowingStrategy.cs" />
     <Compile Include="GameAgent\Strategies\HuntingStrategy.cs" />
     <Compile Include="GameAgent\Strategies\PanicStrategy.cs" />
+    <Compile Include="GameAgent\Strategies\NoisemakerBodyStrategy.cs" />
+    <Compile Include="GameAgent\Strategies\SabotageStrategy.cs" />
     <Compile Include="GameAgent\Strategies\Strategy.cs" />
     <Compile Include="GameAgent\Strategies\TaskDoingStrategy.cs" />
     <Compile Include="GameAgent\Strategies\TaskFakingStrategy.cs" />
+    <Compile Include="GameAgent\Strategies\WanderStrategy.cs" />
     <Compile Include="GameAgent\TaskInput.cs" />
     <Compile Include="GameAgent\TaskManager.cs" />
     <Compile Include="GameAgent\TaskSolvers\AsteroidsSolver.cs" />
@@ -204,6 +210,6 @@
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Emgu.CV.runtime.windows.4.4.0.4099\build\Emgu.CV.runtime.windows.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Emgu.CV.runtime.windows.4.4.0.4099\build\Emgu.CV.runtime.windows.targets'))" />
+    <Warning Condition="!Exists('..\packages\Emgu.CV.runtime.windows.4.4.0.4099\build\Emgu.CV.runtime.windows.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Emgu.CV.runtime.windows.4.4.0.4099\build\Emgu.CV.runtime.windows.targets'))" />
   </Target>
 </Project>

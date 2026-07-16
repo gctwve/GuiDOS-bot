@@ -92,11 +92,31 @@ namespace YourCheese.GameAgent.Conversation
                 {
                     return $"Body was in {map.getLocationRegionName(map.gamePosToMeshPos(reportedBody.position))}.";
                 }
-                return $"I was in {map.getLocationRegionName(map.gamePosToMeshPos(gameData.botPlayer.position))}.";
+
+                var activity = BuildActivityLine(roundMemory);
+                return !string.IsNullOrWhiteSpace(activity) ? activity : $"I was in {map.getLocationRegionName(map.gamePosToMeshPos(gameData.botPlayer.position))}.";
+            }
+
+            if (lower.Contains("doing") || lower.Contains("what did") || lower.Contains("path"))
+            {
+                var activity = BuildActivityLine(roundMemory);
+                if (!string.IsNullOrWhiteSpace(activity))
+                {
+                    return activity;
+                }
             }
 
             if (lower.Contains("who") || lower.Contains("sus") || lower.Contains("imp"))
             {
+                if (gameData.botPlayer.isImposter)
+                {
+                    var roleLine = BuildImposterRoleLine(gameData.botPlayer);
+                    if (!string.IsNullOrWhiteSpace(roleLine))
+                    {
+                        return roleLine;
+                    }
+                }
+
                 var witnessed = GetWitnessLine(roundMemory, map);
                 if (!string.IsNullOrWhiteSpace(witnessed))
                 {
@@ -109,6 +129,15 @@ namespace YourCheese.GameAgent.Conversation
 
             if (lower.Contains(gameData.botPlayer.color.ToLowerInvariant()) || lower.Contains(gameData.botPlayer.name.ToLowerInvariant()))
             {
+                if (gameData.botPlayer.isImposter)
+                {
+                    var roleLine = BuildImposterRoleLine(gameData.botPlayer);
+                    if (!string.IsNullOrWhiteSpace(roleLine))
+                    {
+                        return roleLine;
+                    }
+                }
+
                 return $"I was {map.getLocationRegionName(map.gamePosToMeshPos(gameData.botPlayer.position))}. Check my path.";
             }
 
@@ -135,7 +164,7 @@ namespace YourCheese.GameAgent.Conversation
 
             var choices = new[]
             {
-                $"I was around {map.getLocationRegionName(map.gamePosToMeshPos(gameData.botPlayer.position))}.",
+                BuildActivityLine(roundMemory),
                 "Ask me where or who and I will answer.",
                 "No hard evidence from me yet.",
                 BuildTrustLine(roundMemory)
@@ -168,6 +197,46 @@ namespace YourCheese.GameAgent.Conversation
             return trusted.Count > 0 ? $"I trust {string.Join(", ", trusted)} based on sightings." : null;
         }
 
+        private string BuildActivityLine(RoundMemory roundMemory)
+        {
+            var tasks = roundMemory.completedTasks
+                .Select(task => task.name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .Take(4)
+                .ToList();
+
+            if (tasks.Count > 0)
+            {
+                return $"Before meeting I was doing {string.Join(", ", tasks)}.";
+            }
+
+            var modes = roundMemory.strategies
+                .Select(strategy => strategy.getMode())
+                .Where(mode => !string.IsNullOrWhiteSpace(mode))
+                .Distinct()
+                .Take(3)
+                .ToList();
+
+            return modes.Count > 0 ? $"Before meeting I was {string.Join(", then ", modes).ToLowerInvariant()}." : null;
+        }
+
+        private string BuildImposterRoleLine(PlayerInformation bot)
+        {
+            switch (bot.roleType)
+            {
+                case BotRoleType.Shapeshifter:
+                    return "Shapeshifter is possible, so color alone is not enough evidence.";
+                case BotRoleType.Phantom:
+                    return "Watch for anyone who disappeared or reappeared near the kill timing.";
+                case BotRoleType.Viper:
+                case BotRoleType.Impostor:
+                    return "I would vote from isolation and pathing, not random sus.";
+                default:
+                    return null;
+            }
+        }
+
         private bool IsProbablyMine(string message, PlayerInformation bot)
         {
             return string.Equals(message, Normalize(lastSent), StringComparison.OrdinalIgnoreCase)
@@ -183,9 +252,11 @@ namespace YourCheese.GameAgent.Conversation
                 return;
             }
 
-            lastSent = message;
             Speak(message);
-            chatMessenger.Send(message);
+            if (chatMessenger.Send(message))
+            {
+                lastSent = message;
+            }
         }
 
         private static void Speak(string text)

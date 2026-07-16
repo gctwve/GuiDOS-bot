@@ -12,6 +12,7 @@ namespace YourCheese.GameAgent.Strategies
         Navigator navigator;
         PlayerInformation targetPlayer;
         double confidence = 2;
+        static readonly Random random = new Random();
         bool found = false;
         List<Vertex> points = new List<Vertex>();
 
@@ -24,7 +25,7 @@ namespace YourCheese.GameAgent.Strategies
 
         public void run()
         {
-            while (new Random().NextDouble() < confidence)
+            while (random.NextDouble() < confidence)
             {
                 var targetPos = map.gamePosToMeshPos(targetPlayer.position);
                 var distance = Vector2.Distance(navigator.botPos, targetPos);

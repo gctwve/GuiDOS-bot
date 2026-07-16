@@ -17,31 +17,28 @@ namespace YourCheese.GameAgent.TaskSolvers
 
         public void Solve(DirectBitmap screen)
         {
-            Bitmap screenImage = GameCapture.getGameScreenAsImage(new Rectangle(xOffset, yOffset, 793, 329));
-            List<Vector2> buttons = new List<Vector2>();
-            for (int i=1; i<11; i++)
+            using (Bitmap screenImage = GameCapture.getGameScreenAsImage(new Rectangle(xOffset, yOffset, 793, 329)))
             {
-                buttons.Add(posOfImage(i, screenImage));
-            }
-            TaskInput taskInput = new TaskInput();
-            foreach (var button in buttons)
-            {
-                float x = button.x + xOffset;
-                float y = button.y + yOffset;
-                taskInput.mouseClick(new Vector2(x, y));
-                System.Threading.Thread.Sleep(20);
+                List<Vector2> buttons = new List<Vector2>();
+                for (int i=1; i<11; i++)
+                {
+                    buttons.Add(posOfImage(i, screenImage));
+                }
+                TaskInput taskInput = new TaskInput();
+                foreach (var button in buttons)
+                {
+                    float x = button.x + xOffset;
+                    float y = button.y + yOffset;
+                    taskInput.mouseClick(new Vector2(x, y));
+                    System.Threading.Thread.Sleep(20);
+                }
             }
         }
 
         private Vector2 posOfImage(int templateNum, Bitmap screen)
         {
-            Image<Bgr, byte> Image1 = screen.ToImage<Bgr, byte>(); //Your first image
-
-            String filename = "D:/Studio/Programming/HK47/AmongUsMemory-master/YourCheese/GameAgent/TaskSolvers/templates/manifolds/" + templateNum.ToString() + ".png";
-            Image<Bgr, byte> Image2 = new Image<Bgr, byte>(filename); //Your second image
-
-            double Threshold = 0.8; //set it to a decimal value between 0 and 1.00, 1.00 meaning that the images must be identical
-
+            using (Image<Bgr, byte> Image1 = screen.ToImage<Bgr, byte>())
+            using (Image<Bgr, byte> Image2 = new Image<Bgr, byte>(System.IO.Path.Combine(Constants.FILE_LOCATION, "templates", "manifolds", templateNum.ToString() + ".png")))
             using (Image<Gray, float> result_Matrix = Image1.MatchTemplate(Image2, TemplateMatchingType.CcoeffNormed))
             {
                 Point[] MAX_Loc, Min_Loc;

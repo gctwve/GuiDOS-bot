@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 [System.Serializable]
 [StructLayout(LayoutKind.Sequential)]
-public struct Vector2
+public struct Vector2 : IEquatable<Vector2>
 {
     public float x,y;
 
@@ -45,6 +45,11 @@ public struct Vector2
 
     public static Vector2[] pointsInBetween(Vector2 p1, Vector2 p2, int quantity)
     {
+        if (quantity <= 0)
+        {
+            return new Vector2[0];
+        }
+
         var points = new Vector2[quantity];
         float ydiff = p2.y - p1.y, xdiff = p2.x - p1.x;
         double slope = (double)(p2.y - p1.y) / (p2.x - p1.x);
@@ -97,6 +102,24 @@ public struct Vector2
     public static bool operator !=(Vector2 f1, Vector2 f2)
     {
         return f1.x != f2.x || f1.y != f2.y;
+    }
+
+    public bool Equals(Vector2 other)
+    {
+        return this == other;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is Vector2 other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            return (x.GetHashCode() * 397) ^ y.GetHashCode();
+        }
     }
 
     public bool isVisible(Vector2 p2, float lightRadius)

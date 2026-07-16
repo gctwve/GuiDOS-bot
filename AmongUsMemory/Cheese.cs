@@ -292,28 +292,53 @@ namespace HamsterCheese.AmongUsMemory
 
         public static bool IsInMeeting()
         {
-            var meetingHud = GetMeetingHud();
-            if (meetingHud == IntPtr.Zero)
+            try
+            {
+                var meetingHud = GetMeetingHud();
+                if (meetingHud == IntPtr.Zero)
+                {
+                    return false;
+                }
+
+                // Unity objects can leave managed/static references behind after destroy.
+                // A real active MeetingHud must still have a native object and a populated voter list.
+                var nativeObject = Cheese.mem.ReadInt(meetingHud.Sum(Offset.UnityObjectNativePtr).GetAddress());
+                if (nativeObject == 0)
+                {
+                    return false;
+                }
+
+                var playerStates = ReadPointer(meetingHud.Sum(Offset.MeetingHudPlayerStates));
+                if (playerStates == IntPtr.Zero)
+                {
+                    return false;
+                }
+
+                var playerStateCount = Cheese.mem.ReadInt(playerStates.Sum(Offset.Il2CppListCount).GetAddress());
+                if (playerStateCount <= 0 || playerStateCount > 15)
+                {
+                    return false;
+                }
+
+                var firstPlayerState = ReadPointer(playerStates.Sum(Offset.Il2CppArrayFirstItem));
+                if (firstPlayerState == IntPtr.Zero)
+                {
+                    return false;
+                }
+
+                var state = Cheese.mem.ReadInt(meetingHud.Sum(Offset.MeetingHudState).GetAddress());
+                return state >= 0 && state <= 5;
+            }
+            catch
             {
                 return false;
             }
-
-            // Unity objects can leave managed/static references behind after destroy.
-            // The native UnityEngine.Object pointer at 0x8 is zero once the HUD is gone.
-            var nativeObject = Cheese.mem.ReadInt(meetingHud.Sum(0x8).GetAddress());
-            if (nativeObject == 0)
-            {
-                return false;
-            }
-
-            var state = Cheese.mem.ReadInt(meetingHud.Sum(0x88).GetAddress());
-            return state >= 0 && state <= 5;
         }
 
         public static int GetMeetingVoteState()
         {
             var meetingHud = GetMeetingHud();
-            return meetingHud == IntPtr.Zero ? -1 : Cheese.mem.ReadInt(meetingHud.Sum(0x88).GetAddress());
+            return meetingHud == IntPtr.Zero ? -1 : Cheese.mem.ReadInt(meetingHud.Sum(Offset.MeetingHudState).GetAddress());
         }
 
         public static int GetMeetingVoteButtonIndex(byte playerId)
@@ -324,7 +349,7 @@ namespace HamsterCheese.AmongUsMemory
                 return -1;
             }
 
-            var playerStates = ReadPointer(meetingHud.Sum(0x5C));
+            var playerStates = ReadPointer(meetingHud.Sum(Offset.MeetingHudPlayerStates));
             if (playerStates == IntPtr.Zero)
             {
                 return -1;
@@ -357,6 +382,21 @@ namespace HamsterCheese.AmongUsMemory
         public static IntPtr GetLocalPlayer()
         {
             return ReadStaticPointer(Pattern.PlayerControl_TypeInfo, 0);
+        }
+
+        public static IntPtr ReadPlayerControlPointer(IntPtr playerControlPtr, int offset)
+        {
+            return playerControlPtr == IntPtr.Zero ? IntPtr.Zero : ReadPointer(playerControlPtr.Sum(offset));
+        }
+
+        public static float ReadRoleFloat(IntPtr rolePtr, int offset)
+        {
+            return rolePtr == IntPtr.Zero ? 0 : mem.ReadFloat(rolePtr.Sum(offset).GetAddress());
+        }
+
+        public static bool ReadRoleBool(IntPtr rolePtr, int offset)
+        {
+            return rolePtr != IntPtr.Zero && mem.ReadByte(rolePtr.Sum(offset).GetAddress()) != 0;
         }
          
 

@@ -32,11 +32,18 @@ namespace YourCheese
                     if (!previouslyDeadColors.Contains(colorId))
                     {
                         PlayerInformation victim = currentData.getPlayerByColor(colorId);
-                        if (!previousData.getPlayerByColor(victim.colorId).position.IsGarbage())
+                        PlayerInformation previousVictim = previousData.getPlayerByColor(victim.colorId);
+                        if (!previousVictim.position.IsGarbage())
                         {
                             DeathEvent deathEvent = new DeathEvent(victim, findKiller(victim), currentData.getNearbyPlayers(colorId));
-                            if (currentData.botPlayer.position.isVisible(deathEvent.position, currentData.lightRadius))
+                            if (victim.roleType == BotRoleType.Noisemaker)
+                            {
+                                deathEvents.Add(new NoisemakerDeathEvent(victim, findKiller(victim), currentData.getNearbyPlayers(colorId)));
+                            }
+                            else if (currentData.botPlayer.position.isVisible(deathEvent.position, currentData.lightRadius))
+                            {
                                 deathEvents.Add(deathEvent);
+                            }
                         }
                     }
                 }
@@ -120,7 +127,6 @@ namespace YourCheese
             if (currentData.players.Count > 0 && previousData != null)
             {
                 events.AddRange(processDeaths());
-                events.AddRange(processEmergencyMeeting());
                 events.AddRange(processVentEvents());
             }
             return events;
@@ -159,7 +165,7 @@ namespace YourCheese
 
     public class Event
     {
-        public String getAsString() { return ""; }
+        public virtual String getAsString() { return ""; }
     }
 
     public class DeathEvent : Event
@@ -177,7 +183,17 @@ namespace YourCheese
             this.witnesses = witnesses;
         }
 
-        public String getAsString() { return "I watched "+killer.color+" murder "+victim.color; }
+        public override String getAsString() { return "I watched "+killer.color+" murder "+victim.color; }
+    }
+
+    public class NoisemakerDeathEvent : DeathEvent
+    {
+        public NoisemakerDeathEvent(PlayerInformation victim, PlayerInformation killer, List<PlayerInformation> witnesses)
+            : base(victim, killer, witnesses)
+        {
+        }
+
+        public override String getAsString() { return victim.color + "'s noisemaker alert went off."; }
     }
 
     public class VentEvent : Event
@@ -191,7 +207,7 @@ namespace YourCheese
             this.venter = venter;
         }
 
-        public String getAsString() { return venter.color + " vented right in front of me!"; }
+        public override String getAsString() { return venter.color + " vented right in front of me!"; }
     }
 
     public class TeleportEvent 

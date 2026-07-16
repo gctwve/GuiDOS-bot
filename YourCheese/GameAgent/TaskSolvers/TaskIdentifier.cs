@@ -17,23 +17,64 @@ namespace YourCheese
         private Bitmap screen;
         private TaskSolver taskSolver;
 
-        public void doTask()
+        public bool doTask(GameTask task = null)
         {
-            new TaskInput().pressE();
-            System.Threading.Thread.Sleep(600);
-            screen = GameCapture.getGameScreenAsImage();
-            taskSolver = getTaskSolver();
-            if (taskSolver != null)
+            var input = new TaskInput();
+            input.pressE();
+            if (TaskInput.SuppressActionKeys)
             {
-                taskSolver.Solve(GameCapture.getGameScreen());
+                return false;
             }
-            screen.Dispose();
+
+            System.Threading.Thread.Sleep(600);
+            if (TaskInput.SuppressActionKeys)
+            {
+                return false;
+            }
+
+            using (screen = GameCapture.getGameScreenAsImage())
+            {
+                taskSolver = getTaskSolver();
+            }
+
+            if (taskSolver == null)
+            {
+                input.pressE();
+                System.Threading.Thread.Sleep(600);
+                using (screen = GameCapture.getGameScreenAsImage())
+                {
+                    taskSolver = getTaskSolver();
+                }
+            }
+
+            if (taskSolver == null)
+            {
+                taskSolver = getTaskSolver(task);
+            }
+
+            if (taskSolver != null && !TaskInput.SuppressActionKeys)
+            {
+                DirectBitmap taskScreen = null;
+                try
+                {
+                    taskScreen = GameCapture.getGameScreen();
+                    Console.WriteLine("Solving task with " + taskSolver.GetType().Name);
+                    taskSolver.Solve(taskScreen);
+                    return true;
+                }
+                finally
+                {
+                    taskScreen?.Dispose();
+                }
+            }
+
             System.Threading.Thread.Sleep(500);
+            return false;
         }
 
         public void abort()
         {
-            taskSolver.abort();
+            taskSolver?.abort();
         }
 
         public TaskSolver getTaskSolver()
@@ -118,6 +159,56 @@ namespace YourCheese
             return null;
         }
 
+        public TaskSolver getTaskSolver(GameTask task)
+        {
+            if (task == null)
+            {
+                return null;
+            }
+
+            switch (task.taskType)
+            {
+                case 0:
+                    return new MedscanSolver();
+                case 1:
+                    return new ShieldsSolver();
+                case 2:
+                    return new GasSolver();
+                case 3:
+                    return new ChartCourseSolver();
+                case 4:
+                    return new SimonSaysSolver();
+                case 5:
+                    return new CardSwipeSolver();
+                case 6:
+                    return new AsteroidsSolver();
+                case 7:
+                    return new DownloadSolver();
+                case 8:
+                    return task.name != null && task.name.IndexOf("ready", StringComparison.OrdinalIgnoreCase) >= 0
+                        ? (TaskSolver)new InspectSampleReadySolver()
+                        : new InspectSampleSolver();
+                case 9:
+                    return new TrashSolver();
+                case 11:
+                    return new EngineAdjustSolver();
+                case 12:
+                    return new WireSolver();
+                case 13:
+                    return new DistributorSolver();
+                case 14:
+                    return task.systemType == 7 ? (TaskSolver)new DivertPowerSolver() : new DivertPowerSwitchSolver();
+                case 15:
+                    return new ManifoldSolver();
+                case 18:
+                    return new LeavesSolver();
+                case 21:
+                    return new SteeringSolver();
+                default:
+                    return null;
+            }
+        }
+
         public bool containsImage(string templateName, Rectangle rect)
         {
             //String filename = "D:/Studio/Programming/HK47/AmongUsMemory-master/YourCheese/GameAgent/TaskSolvers/templates/" + templateName + ".png";
@@ -134,29 +225,49 @@ namespace YourCheese
 
 
 
-            Bitmap croppedImage = screen.Clone(rect, screen.PixelFormat);
-            croppedImage.Save(Constants.FILE_LOCATION + "/templates/CURRENTLY_SCANNED.png");
-            Image<Bgr, byte> Image1 = croppedImage.ToImage<Bgr, byte>(); //Your first image
-
-            String filename = Constants.FILE_LOCATION + "/templates/" + templateName + ".jpg";
-            Image<Bgr, byte> Image2 = new Image<Bgr, byte>(filename); //Your second image
-
-            double Threshold = 0.7; //set it to a decimal value between 0 and 1.00, 1.00 meaning that the images must be identical
-
-            Image<Gray, float> Matches = Image1.MatchTemplate(Image2, TemplateMatchingType.CcoeffNormed);
-
-            for (int y = 0; y < Matches.Data.GetLength(0); y++)
+            using (Bitmap croppedImage = screen.Clone(rect, screen.PixelFormat))
+            using (Image<Bgr, byte> Image1 = croppedImage.ToImage<Bgr, byte>())
             {
-                for (int x = 0; x < Matches.Data.GetLength(1); x++)
+                croppedImage.Save(Constants.FILE_LOCATION + "/templates/CURRENTLY_SCANNED.png");
+
+                String filename = GetTemplateFile(templateName);
+                if (filename == null)
                 {
-                    if (Matches.Data[y, x, 0] >= Threshold) //Check if its a valid match
+                    return false;
+                }
+
+                using (Image<Bgr, byte> Image2 = new Image<Bgr, byte>(filename))
+                using (Image<Gray, float> Matches = Image1.MatchTemplate(Image2, TemplateMatchingType.CcoeffNormed))
+                {
+                    double Threshold = 0.7; //set it to a decimal value between 0 and 1.00, 1.00 meaning that the images must be identical
+
+                    for (int y = 0; y < Matches.Data.GetLength(0); y++)
                     {
-                        //Image2 found within Image1
-                        return true;
+                        for (int x = 0; x < Matches.Data.GetLength(1); x++)
+                        {
+                            if (Matches.Data[y, x, 0] >= Threshold) //Check if its a valid match
+                            {
+                                //Image2 found within Image1
+                                return true;
+                            }
+                        }
                     }
                 }
             }
             return false;
+        }
+
+        private string GetTemplateFile(string templateName)
+        {
+            var templateRoot = System.IO.Path.Combine(Constants.FILE_LOCATION, "templates");
+            var jpg = System.IO.Path.Combine(templateRoot, templateName + ".jpg");
+            if (System.IO.File.Exists(jpg))
+            {
+                return jpg;
+            }
+
+            var png = System.IO.Path.Combine(templateRoot, templateName + ".png");
+            return System.IO.File.Exists(png) ? png : null;
         }
 
         public Point? Find(DirectBitmap haystack, DirectBitmap needle)

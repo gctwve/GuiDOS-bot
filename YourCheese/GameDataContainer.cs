@@ -6,6 +6,48 @@ using System.Threading.Tasks;
 
 namespace YourCheese
 {
+    public enum ActiveSabotage
+    {
+        None,
+        Lights,
+        Critical
+    }
+
+    public enum BotRoleType
+    {
+        Crewmate = 0,
+        Impostor = 1,
+        Shapeshifter = 5,
+        ImpostorGhost = 7,
+        Noisemaker = 8,
+        Phantom = 9,
+        Viper = 18,
+        Unknown = 255
+    }
+
+    public struct RoleMemorySnapshot
+    {
+        public IntPtr rolePtr;
+        public IntPtr closestUsablePtr;
+        public IntPtr itemsInRangePtr;
+        public IntPtr newItemsInRangePtr;
+        public float abilityCooldown;
+        public float abilityDuration;
+        public bool isInvisible;
+        public bool isFading;
+        public bool serverApproved;
+
+        public bool HasRoleMemory
+        {
+            get { return rolePtr != IntPtr.Zero; }
+        }
+
+        public bool AbilityReady
+        {
+            get { return HasRoleMemory && abilityCooldown <= 0.05f; }
+        }
+    }
+
     public struct PlayerInformation
     {
         public Vector2 position;
@@ -17,6 +59,9 @@ namespace YourCheese
         public bool isImposter; // only used for bot player and their partner during imp rounds
         public float killTimer;
         public uint remainingEmergencies;
+        public BotRoleType roleType;
+        public byte playerId;
+        public RoleMemorySnapshot roleMemory;
 
         public PlayerInformation(Vector2 position, String name, byte color, byte isDead, uint remainingEmergencies, bool inVent)
         {
@@ -29,9 +74,12 @@ namespace YourCheese
             this.inVent = inVent;
             this.isImposter = false;
             this.killTimer = 0;
+            this.roleType = BotRoleType.Unknown;
+            this.playerId = color;
+            this.roleMemory = new RoleMemorySnapshot();
         }
 
-        public PlayerInformation(Vector2 position, String name, byte color, byte isDead, uint remainingEmergencies, bool inVent, byte isImposter, float killTimer)
+        public PlayerInformation(Vector2 position, String name, byte color, byte isDead, uint remainingEmergencies, bool inVent, byte isImposter, float killTimer, ushort roleType, byte playerId, RoleMemorySnapshot roleMemory)
         {
             this.position = position;
             this.name = name;
@@ -42,6 +90,24 @@ namespace YourCheese
             this.inVent = inVent;
             this.isImposter = System.Convert.ToBoolean(isImposter);
             this.killTimer = killTimer;
+            this.roleType = DecodeRole(roleType);
+            this.playerId = playerId;
+            this.roleMemory = roleMemory;
+        }
+
+        public string RoleName
+        {
+            get { return roleType.ToString(); }
+        }
+
+        private static BotRoleType DecodeRole(ushort roleType)
+        {
+            if (Enum.IsDefined(typeof(BotRoleType), (int)roleType))
+            {
+                return (BotRoleType)roleType;
+            }
+
+            return BotRoleType.Unknown;
         }
 
         public static PlayerInformation Zero
@@ -100,6 +166,7 @@ namespace YourCheese
         public bool isInLobby;
         public bool isInGame;
         public bool isInMeeting;
+        public ActiveSabotage activeSabotage;
 
         public List<PlayerInformation> getImposters()
         {

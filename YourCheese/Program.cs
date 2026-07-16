@@ -92,6 +92,7 @@ namespace YourCheese
                 GameDataContainer gameData = new GameDataContainer();
                 gameData.emergencyCooldown = shipStatus.EmergencyCooldown;
                 gameData.gameState = (int)client.GameState;
+                gameData.activeSabotage = ActiveSabotage.None;
                 bool meetingHudPresent = HamsterCheese.AmongUsMemory.Cheese.IsInMeeting();
                 bool localPlayerFound = false;
                 List<PlayerInformation> players = new List<PlayerInformation>();
@@ -112,13 +113,13 @@ namespace YourCheese
                     if (data.IsLocalPlayer)
                     {
                         localPlayerFound = true;
-                        gameData.botPlayer = new PlayerInformation(data.Position, Name, playerInfo.Value.ColorId, playerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), playerInfo.Value.IsImpostor, data.getKillTimer());
+                        gameData.botPlayer = new PlayerInformation(data.Position, Name, playerInfo.Value.ColorId, playerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), playerInfo.Value.IsImpostor, data.getKillTimer(), playerInfo.Value.RoleType, playerInfo.Value.PlayerId, ReadRoleMemory(data, playerInfo.Value));
                         LightSource ls = data.LightSource;
                         gameData.lightRadius = ls.LightRadius;
                     }
                     else
                     {
-                        PlayerInformation player = new PlayerInformation(data.Position, Name, playerInfo.Value.ColorId, playerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), playerInfo.Value.IsImpostor, data.getKillTimer());
+                        PlayerInformation player = new PlayerInformation(data.Position, Name, playerInfo.Value.ColorId, playerInfo.Value.IsDead, data.remainingEmergencies(), data.inVent(), playerInfo.Value.IsImpostor, data.getKillTimer(), playerInfo.Value.RoleType, playerInfo.Value.PlayerId, ReadRoleMemory(data, playerInfo.Value));
                         players.Add(player);
                     }
 
@@ -128,7 +129,18 @@ namespace YourCheese
                 gameData.players = players;
                 gameData.isInGame = localPlayerFound;
                 gameData.isInLobby = gameData.gameState == 1;
-                gameData.isInMeeting = meetingHudPresent && localPlayerFound;
+                gameData.isInMeeting = meetingHudPresent && localPlayerFound && gameData.gameState == 2;
+                if (localPlayerFound && gameData.isInGame && !gameData.isInMeeting)
+                {
+                    if (gameData.lightRadius > 0 && shipStatus.MinLightRadius > 0 && gameData.lightRadius <= shipStatus.MinLightRadius + 0.25f)
+                    {
+                        gameData.activeSabotage = ActiveSabotage.Lights;
+                    }
+                    else if (shipStatus.Timer > 0 && shipStatus.Timer < 120)
+                    {
+                        gameData.activeSabotage = ActiveSabotage.Critical;
+                    }
+                }
                 var isActiveRound = gameData.isInGame && gameData.gameState == 2;
                 if (wasInActiveRound && !isActiveRound)
                 {
@@ -148,7 +160,7 @@ namespace YourCheese
                     PrintLine();
                 }
                 PrintRow($"Light level: {gameData.lightRadius}");
-                PrintRow($"StrategyMode: {behaviorDriver.StrategyMode}", "F6 cycles mode");
+                PrintRow($"StrategyMode: {behaviorDriver.StrategyMode}", "F6 cycles mode", "F7 mouse test");
                 PrintRow($"GameState: {gameData.gameState}", $"Lobby: {gameData.isInLobby}", $"InGame: {gameData.isInGame}", $"Meeting: {gameData.isInMeeting}");
                 PrintRow($"OriginalPos: {gameData.botPlayer.position.x},{gameData.botPlayer.position.y}");
                 Vector2 meshPos = skeld.gamePosToMeshPos(gameData.botPlayer.position);
@@ -189,11 +201,67 @@ namespace YourCheese
                     {
                         behaviorDriver.CycleStrategyMode();
                     }
+                    else if (key.Key == ConsoleKey.F7)
+                    {
+                        RunMouseTest();
+                    }
                 }
             }
             catch
             {
             }
+        }
+
+        static void RunMouseTest()
+        {
+            Console.WriteLine("Running real mouse movement test.");
+            var input = new TaskInput();
+            input.mouseClick(TaskScreenLayout.Center);
+            System.Threading.Thread.Sleep(250);
+            input.mouseClick(TaskScreenLayout.MouseTestCard);
+            System.Threading.Thread.Sleep(250);
+            input.mouseClick(TaskScreenLayout.MouseTestSwipeEnd);
+        }
+
+        static RoleMemorySnapshot ReadRoleMemory(PlayerData data, PlayerInfo playerInfo)
+        {
+            var snapshot = new RoleMemorySnapshot()
+            {
+                rolePtr = playerInfo.Role
+            };
+
+            try
+            {
+                snapshot.closestUsablePtr = HamsterCheese.AmongUsMemory.Cheese.ReadPlayerControlPointer(data.PlayerControllPTR, HamsterCheese.AmongUsMemory.Offset.PlayerControlClosestUsable);
+                snapshot.itemsInRangePtr = HamsterCheese.AmongUsMemory.Cheese.ReadPlayerControlPointer(data.PlayerControllPTR, HamsterCheese.AmongUsMemory.Offset.PlayerControlItemsInRange);
+                snapshot.newItemsInRangePtr = HamsterCheese.AmongUsMemory.Cheese.ReadPlayerControlPointer(data.PlayerControllPTR, HamsterCheese.AmongUsMemory.Offset.PlayerControlNewItemsInRange);
+
+                if (snapshot.rolePtr == IntPtr.Zero)
+                {
+                    return snapshot;
+                }
+
+                switch ((BotRoleType)playerInfo.RoleType)
+                {
+                    case BotRoleType.Phantom:
+                        snapshot.abilityCooldown = HamsterCheese.AmongUsMemory.Cheese.ReadRoleFloat(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.PhantomCooldownSecondsRemaining);
+                        snapshot.abilityDuration = HamsterCheese.AmongUsMemory.Cheese.ReadRoleFloat(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.PhantomDurationSecondsRemaining);
+                        snapshot.isInvisible = HamsterCheese.AmongUsMemory.Cheese.ReadRoleBool(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.PhantomIsInvisible);
+                        snapshot.isFading = HamsterCheese.AmongUsMemory.Cheese.ReadRoleBool(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.PhantomIsFading);
+                        snapshot.serverApproved = HamsterCheese.AmongUsMemory.Cheese.ReadRoleBool(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.PhantomServerApproved);
+                        break;
+                    case BotRoleType.Shapeshifter:
+                        snapshot.abilityCooldown = HamsterCheese.AmongUsMemory.Cheese.ReadRoleFloat(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.ShapeshifterCooldownSecondsRemaining);
+                        snapshot.abilityDuration = HamsterCheese.AmongUsMemory.Cheese.ReadRoleFloat(snapshot.rolePtr, HamsterCheese.AmongUsMemory.Offset.ShapeshifterDurationSecondsRemaining);
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Could not read role memory: " + e.Message);
+            }
+
+            return snapshot;
         }
 
         [STAThread]

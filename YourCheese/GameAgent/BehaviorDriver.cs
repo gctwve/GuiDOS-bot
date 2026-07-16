@@ -103,7 +103,7 @@ namespace YourCheese
                 }
                 while (!inEmergencyMeeting && botInfo.isDead && !botInfo.isImposter && remainingTasks > 0)
                 {
-                    var taskDoingStrategy = new TaskDoingStrategy(navigator, map);
+                    var taskDoingStrategy = new TaskDoingStrategy(navigator, map, false, roundMemory.completedTasks);
                     taskDoingStrategy.run();
                     remainingTasks = taskDoingStrategy.taskPositions.Count;
                 }
@@ -167,14 +167,14 @@ namespace YourCheese
             switch (StrategyMode)
             {
                 case BotStrategyMode.Balanced:
-                    return random.Next(5) == 0 ? getFollowStrategyOrTasks() : new TaskDoingStrategy(navigator, map);
+                    return random.Next(5) == 0 ? getFollowStrategyOrTasks() : getTaskStrategyOrWander(false);
                 case BotStrategyMode.Follow:
                     return getFollowStrategyOrTasks();
                 case BotStrategyMode.SearchBodies:
                     return new BodySearchingStrategy(navigator, map);
                 case BotStrategyMode.FinishTasks:
                 default:
-                    return new TaskDoingStrategy(navigator, map, true);
+                    return getTaskStrategyOrWander(true);
             }
         }
 
@@ -198,10 +198,42 @@ namespace YourCheese
             var livingTargets = gameDataContainer.getLivingPlayersThatArentBot();
             if (livingTargets.Count == 0)
             {
-                return new TaskDoingStrategy(navigator, map, true);
+                return getTaskStrategyOrWander(true);
             }
 
             return new FollowingStrategy(navigator, map, livingTargets[random.Next(livingTargets.Count)]);
+        }
+
+        private Strategy getTaskStrategyOrWander(bool finishAllTasks)
+        {
+            var taskPositions = new TaskManager().getTaskPositions(false);
+            taskPositions.RemoveAll(task => roundMemory.completedTasks.Contains(task));
+            if (taskPositions.Count == 0)
+            {
+                remainingTasks = 0;
+                return getNoTaskFallbackStrategy();
+            }
+
+            remainingTasks = taskPositions.Count;
+            return new TaskDoingStrategy(navigator, map, finishAllTasks, roundMemory.completedTasks, taskPositions);
+        }
+
+        private Strategy getNoTaskFallbackStrategy()
+        {
+            var livingTargets = gameDataContainer.getLivingPlayersThatArentBot();
+            var roll = random.NextDouble();
+
+            if (livingTargets.Count > 0 && roll < 0.55)
+            {
+                return new FollowingStrategy(navigator, map, livingTargets[random.Next(livingTargets.Count)]);
+            }
+
+            if (roll < 0.85)
+            {
+                return new BodySearchingStrategy(navigator, map);
+            }
+
+            return new WanderStrategy(navigator, map);
         }
 
         private Strategy getFollowStrategyOrFakeTasks()
@@ -228,6 +260,7 @@ namespace YourCheese
         public void ClearGameMemory()
         {
             roundMemory.refresh();
+            GameChatMessenger.ClearRecentMessages();
             meetingChatDirector.ClearMemory();
             lobbyChatDirector.Reset();
             talked = false;
@@ -250,6 +283,18 @@ namespace YourCheese
 
         private void processEvents(List<Event> events, List<PlayerInformation> nearbyPlayers)
         {
+            if (!botInfo.isDead)
+            {
+                foreach (var myEvent in events)
+                {
+                    if (myEvent is NoisemakerDeathEvent noisemakerDeath)
+                    {
+                        overrideStrategy(new NoisemakerBodyStrategy(navigator, map, noisemakerDeath));
+                        return;
+                    }
+                }
+            }
+
             if (!botInfo.isImposter)
             {
                 foreach (var player in visiblePlayers)
@@ -323,6 +368,7 @@ namespace YourCheese
             gameDataContainer = gameUpdate.gameDataContainer;
             if (!gameDataContainer.isInGame)
             {
+                TaskInput.SuppressActionKeys = false;
                 if (currentStrategy != null)
                 {
                     currentStrategy.abort();
@@ -336,6 +382,7 @@ namespace YourCheese
 
             if (gameDataContainer.isInMeeting)
             {
+                TaskInput.SuppressActionKeys = true;
                 if (!inEmergencyMeeting)
                 {
                     overrideStrategy(null);
@@ -348,6 +395,7 @@ namespace YourCheese
 
             if (inEmergencyMeeting)
             {
+                TaskInput.SuppressActionKeys = false;
                 inEmergencyMeeting = false;
                 talked = false;
                 meetingChatDirector.ResetMeetingState();
@@ -357,7 +405,9 @@ namespace YourCheese
             updateBotInfo(gameUpdate.gameDataContainer.botPlayer);
             visiblePlayers = gameUpdate.visiblePlayers;
             roundMemory.update(gameUpdate.events, gameUpdate.visiblePlayers);
+            TaskInput.SuppressActionKeys = false;
             inEmergencyMeeting = false;
+
             //inEmergencyMeeting = (gameDataContainer.emergencyCooldown < gameUpdate.gameDataContainer.emergencyCooldown);
             if (currentStrategy != null)
             currentStrategy.update(gameDataContainer);
